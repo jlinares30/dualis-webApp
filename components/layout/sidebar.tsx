@@ -8,6 +8,8 @@ import {
   Wallet, 
   Receipt, 
   PieChart, 
+  HeartHandshake,
+  Users,
   Settings, 
   Sparkles,
   X,
@@ -26,6 +28,8 @@ export const navigationItems: NavItem[] = [
   { name: 'Cuentas', href: '/cuentas', icon: Wallet },
   { name: 'Transacciones', href: '/transacciones', icon: Receipt },
   { name: 'Presupuestos', href: '/presupuestos', icon: PieChart },
+  { name: 'Liquidación', href: '/liquidacion', icon: HeartHandshake },
+  { name: 'Espacios', href: '/espacios', icon: Users },
   { name: 'Configuración', href: '/configuracion', icon: Settings },
 ];
 

@@ -24,12 +24,12 @@ export function SummaryCards({ workspace }: SummaryCardsProps) {
       gradient: 'from-emerald-500/10 via-emerald-500/5 to-transparent',
       borderColor: 'border-emerald-500/20',
       iconBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      subtext: data ? `Ahorro neto: ${formatCurrency(data.netSavings, data.currency || 'COP')}` : (isCouple ? 'Cuentas compartidas sincronizadas' : 'En 3 cuentas activas'),
+      subtext: data ? `Ahorro neto: ${formatCurrency(data.netSavings, data.currency || 'PEN')}` : (isCouple ? 'Cuentas compartidas sincronizadas' : 'En 3 cuentas activas'),
     },
     {
       title: 'Gastos del Mes',
-      amount: data ? data.monthlyExpenses : (isCouple ? 2150000 : 1450000),
-      change: data ? `Ingresos: ${formatCurrency(data.monthlyIncome, data.currency || 'COP')}` : '-4.1%',
+      amount: data ? data.monthlyExpenses : (isCouple ? 2150 : 1450),
+      change: data ? `Ingresos: ${formatCurrency(data.monthlyIncome, data.currency || 'PEN')}` : '-4.1%',
       isPositive: true,
       icon: TrendingDown,
       gradient: 'from-rose-500/10 via-rose-500/5 to-transparent',
@@ -39,7 +39,7 @@ export function SummaryCards({ workspace }: SummaryCardsProps) {
     },
     {
       title: isCouple ? 'Balance de Liquidación' : 'Balance Compartido',
-      amount: data ? Math.abs(data.partnerDebtBalance) : (isCouple ? 180000 : 85000),
+      amount: data ? Math.abs(data.partnerDebtBalance) : (isCouple ? 180 : 85),
       change: data ? (data.partnerDebtStatus || 'Pendiente') : (isCouple ? 'A favor tuyo' : 'Pendiente'),
       isPositive: true,
       icon: Users,
@@ -48,7 +48,7 @@ export function SummaryCards({ workspace }: SummaryCardsProps) {
       iconBg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
       subtext: data 
         ? (data.partnerDebtBalance >= 0 ? 'Te deben esta cantidad' : 'Debes esta cantidad a tu pareja')
-        : (isCouple ? 'Sofía te debe $180.000 COP' : 'Tu cuota del mes saldada'),
+        : (isCouple ? 'Sofía te debe S/ 180' : 'Tu cuota del mes saldada'),
     },
   ];
 
@@ -75,7 +75,7 @@ export function SummaryCards({ workspace }: SummaryCardsProps) {
                 {isLoading ? (
                   <span className="inline-block w-24 h-7 bg-gray-800 animate-pulse rounded-lg" />
                 ) : (
-                  formatCurrency(item.amount, data?.currency || 'COP')
+                  formatCurrency(item.amount, data?.currency || 'PEN')
                 )}
               </h3>
               <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">

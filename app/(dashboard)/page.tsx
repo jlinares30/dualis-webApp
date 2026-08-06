@@ -5,6 +5,7 @@ import { SummaryCards } from '@/components/dashboard/summary-cards';
 import { QuickActions } from '@/components/dashboard/quick-actions';
 import { RecentTransactions } from '@/components/dashboard/recent-transactions';
 import { BudgetWidget } from '@/components/dashboard/budget-widget';
+import { CashFlowChart } from '@/components/dashboard/cash-flow-chart';
 import { WorkspaceType } from '@/types/finance';
 import { HeartHandshake, User, Sparkles } from 'lucide-react';
 
@@ -44,6 +45,9 @@ export default function DashboardPage({ workspace = 'couple' }: DashboardPagePro
 
       {/* Financial Summary Metric Cards */}
       <SummaryCards workspace={workspace} />
+
+      {/* Cash Flow Chart */}
+      <CashFlowChart />
 
       {/* Two Column Grid: Transactions & Budget Widget */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

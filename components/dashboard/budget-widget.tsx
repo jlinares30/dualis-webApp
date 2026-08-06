@@ -8,33 +8,33 @@ const mockBudgets: BudgetCategory[] = [
     id: 'b-1',
     name: 'Mercado y Alimentación',
     category: 'food',
-    spent: 820000,
-    limit: 1000000,
-    currency: 'COP',
+    spent: 820,
+    limit: 1000,
+    currency: 'PEN',
   },
   {
     id: 'b-2',
     name: 'Servicios Públicos',
     category: 'utilities',
-    spent: 240000,
-    limit: 400000,
-    currency: 'COP',
+    spent: 240,
+    limit: 400,
+    currency: 'PEN',
   },
   {
     id: 'b-3',
     name: 'Entretenimiento & Salidas',
     category: 'entertainment',
-    spent: 470000,
-    limit: 500000,
-    currency: 'COP',
+    spent: 470,
+    limit: 500,
+    currency: 'PEN',
   },
   {
     id: 'b-4',
     name: 'Transporte y Movilidad',
     category: 'transport',
-    spent: 120000,
-    limit: 300000,
-    currency: 'COP',
+    spent: 120,
+    limit: 300,
+    currency: 'PEN',
   },
 ];
 
@@ -95,7 +95,7 @@ export function BudgetWidget() {
         <div className="flex justify-between items-baseline text-xs">
           <span className="text-gray-400">Gasto Total Acumulado</span>
           <span className="font-bold text-white">
-            {formatCurrency(totalSpent, 'COP')} <span className="text-gray-400 font-normal">/ {formatCurrency(totalLimit, 'COP')}</span>
+            {formatCurrency(totalSpent, 'PEN')} <span className="text-gray-400 font-normal">/ {formatCurrency(totalLimit, 'PEN')}</span>
           </span>
         </div>
         <div className="w-full h-3 rounded-full bg-gray-800 overflow-hidden p-0.5">
@@ -117,7 +117,7 @@ export function BudgetWidget() {
               <div className="flex justify-between items-center text-xs">
                 <span className="font-medium text-gray-200">{item.name}</span>
                 <span className="text-gray-400">
-                  <span className="font-semibold text-gray-100">{formatCurrency(item.spent, 'COP')}</span> ({pct}%)
+                  <span className="font-semibold text-gray-100">{formatCurrency(item.spent, 'PEN')}</span> ({pct}%)
                 </span>
               </div>
               <div className="w-full h-2 rounded-full bg-gray-800 overflow-hidden">
