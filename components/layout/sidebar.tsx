@@ -44,6 +44,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
   const pathname = usePathname();
   const { hasPartner, partnerName } = useWorkspaceStore();
 
+  // Filtrado reactivo dinámico: Solo si el usuario vincula a una pareja se muestran las opciones de pareja
   const filteredNavItems = navigationItems.filter((item) => {
     if (!hasPartner && (item.href === '/settlements' || item.href === '/workspaces')) {
       return false;
@@ -109,25 +110,13 @@ export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
         })}
       </nav>
 
-      {/* Shared Space Status Card */}
-      {hasPartner ? (
-        <div className="mt-auto p-3.5 rounded-xl bg-gradient-to-br from-indigo-950/40 via-gray-900 to-emerald-950/30 border border-indigo-500/20">
-          <div className="flex items-center gap-2 mb-1.5">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-medium text-gray-300">Sincronizado con {partnerName || 'Pareja'}</span>
-          </div>
-          <p className="text-[11px] text-gray-400 leading-relaxed">
-            Gastos compartidos en tiempo real activos.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-auto p-3.5 rounded-xl bg-gray-900/60 border border-gray-800/60 text-center">
-          <span className="block text-xs font-bold text-gray-300">Modo Individual</span>
-          <p className="text-[10px] text-gray-500 mt-0.5">
-            Vincula una pareja en Configuración para activar gastos compartidos.
-          </p>
-        </div>
-      )}
+      {/* Personal Status Badge Footer */}
+      <div className="mt-auto p-3.5 rounded-xl bg-gray-900/60 border border-gray-800/60 text-center">
+        <span className="block text-xs font-bold text-gray-300">Espacio Personal</span>
+        <p className="text-[10px] text-gray-500 mt-0.5">
+          Gestión de finanzas individuales activa.
+        </p>
+      </div>
     </div>
   );
 

@@ -21,6 +21,7 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { WorkspaceType, CategoryType, Transaction } from '@/types/finance';
 import { CreateTransactionModal } from '@/components/modals/create-transaction-modal';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 const mockAllTransactions: Transaction[] = [
   {
@@ -108,13 +109,15 @@ const categoryIconMap: Record<CategoryType, React.ComponentType<{ className?: st
   income: ArrowDownLeft,
 };
 
-export default function TransactionsPage({ workspace = 'couple' }: { workspace?: WorkspaceType }) {
+export default function TransactionsPage({ workspace = 'personal' }: { workspace?: WorkspaceType }) {
+  const { hasPartner } = useWorkspaceStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'income' | 'expense'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const filtered = mockAllTransactions.filter((tx) => {
-    const matchesWorkspace = workspace === 'couple' ? tx.workspace === 'couple' : true;
+    const isCoupleWorkspace = hasPartner && workspace === 'couple';
+    const matchesWorkspace = isCoupleWorkspace ? tx.workspace === 'couple' : true;
     const matchesSearch = tx.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = selectedType === 'all' || tx.type === selectedType;
     return matchesWorkspace && matchesSearch && matchesType;
@@ -213,7 +216,7 @@ export default function TransactionsPage({ workspace = 'couple' }: { workspace?:
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-sm text-white">{tx.title}</span>
-                      {tx.workspace === 'couple' ? (
+                      {hasPartner && tx.workspace === 'couple' ? (
                         <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
                           <Users className="w-3 h-3" /> Shared {tx.splitRatio}
                         </span>
@@ -227,7 +230,7 @@ export default function TransactionsPage({ workspace = 'couple' }: { workspace?:
                       <span>{tx.categoryLabel}</span>
                       <span>•</span>
                       <span>{tx.date}</span>
-                      {tx.paidBy && (
+                      {hasPartner && tx.paidBy && (
                         <>
                           <span>•</span>
                           <span className="text-gray-300">Pagado por {tx.paidBy}</span>

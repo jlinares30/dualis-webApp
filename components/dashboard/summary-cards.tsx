@@ -16,39 +16,37 @@ export function SummaryCards({ workspace }: SummaryCardsProps) {
 
   const metrics = [
     {
-      title: isCouple ? 'Fondo Pareja Disponible' : 'Total Disponible',
-      amount: data ? data.totalLiquidity : (isCouple ? 4850000 : 3200000),
-      change: data ? `${data.savingsRate.toFixed(1)}%` : '+8.2%',
+      title: 'Total Disponible',
+      amount: data ? data.totalLiquidity : 0,
+      change: data ? `${data.savingsRate.toFixed(1)}%` : '0%',
       isPositive: true,
       icon: Wallet,
       gradient: 'from-emerald-500/10 via-emerald-500/5 to-transparent',
       borderColor: 'border-emerald-500/20',
       iconBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      subtext: data ? `Ahorro neto: ${formatCurrency(data.netSavings, data.currency || 'PEN')}` : (isCouple ? 'Cuentas compartidas sincronizadas' : 'En 3 cuentas activas'),
+      subtext: data ? `Ahorro neto: ${formatCurrency(data.netSavings, data.currency || 'PEN')}` : 'Sin cuentas registradas',
     },
     {
       title: 'Gastos del Mes',
-      amount: data ? data.monthlyExpenses : (isCouple ? 2150 : 1450),
-      change: data ? `Ingresos: ${formatCurrency(data.monthlyIncome, data.currency || 'PEN')}` : '-4.1%',
+      amount: data ? data.monthlyExpenses : 0,
+      change: data ? `Ingresos: ${formatCurrency(data.monthlyIncome, data.currency || 'PEN')}` : 'S/ 0.00',
       isPositive: true,
       icon: TrendingDown,
       gradient: 'from-rose-500/10 via-rose-500/5 to-transparent',
       borderColor: 'border-rose-500/20',
       iconBg: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-      subtext: data ? `${data.exceededBudgetsCount} presupuestos excedidos` : 'Presupuesto mensual bajo control',
+      subtext: data ? `${data.exceededBudgetsCount} presupuestos excedidos` : 'Sin gastos registrados este mes',
     },
     {
-      title: isCouple ? 'Balance de Liquidación' : 'Balance Compartido',
-      amount: data ? Math.abs(data.partnerDebtBalance) : (isCouple ? 180 : 85),
-      change: data ? (data.partnerDebtStatus || 'Pendiente') : (isCouple ? 'A favor tuyo' : 'Pendiente'),
+      title: 'Ingresos del Mes',
+      amount: data ? data.monthlyIncome : 0,
+      change: '0%',
       isPositive: true,
       icon: Users,
       gradient: 'from-indigo-500/10 via-indigo-500/5 to-transparent',
       borderColor: 'border-indigo-500/20',
       iconBg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-      subtext: data 
-        ? (data.partnerDebtBalance >= 0 ? 'Te deben esta cantidad' : 'Debes esta cantidad a tu pareja')
-        : (isCouple ? 'Sofía te debe S/ 180' : 'Tu cuota del mes saldada'),
+      subtext: 'Acumulado mensual de ingresos',
     },
   ];
 
