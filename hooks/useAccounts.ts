@@ -1,0 +1,39 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getAccounts, createAccount, deleteAccount, CreateAccountRequest } from '@/lib/services/accounts-service';
+import { useAuthStore } from '@/lib/stores/useAuthStore';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+
+export function useAccounts() {
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  return useQuery({
+    queryKey: ['accounts', activeWorkspaceId],
+    queryFn: () => getAccounts(activeWorkspaceId || undefined),
+    enabled: isAuthenticated,
+  });
+}
+
+export function useCreateAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (newAccount: CreateAccountRequest) => createAccount(newAccount),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+}
+
+export function useDeleteAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteAccount(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+}

@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { X, Wallet, Landmark, CreditCard, Sparkles } from 'lucide-react';
+import { useCreateAccount } from '@/hooks/useAccounts';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 interface CreateAccountModalProps {
   isOpen: boolean;
@@ -9,6 +11,9 @@ interface CreateAccountModalProps {
 }
 
 export function CreateAccountModal({ isOpen, onClose }: CreateAccountModalProps) {
+  const { mutateAsync: createAccount, isPending } = useCreateAccount();
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+
   const [name, setName] = useState('');
   const [type, setType] = useState('bank');
   const [balance, setBalance] = useState('');
@@ -16,9 +21,27 @@ export function CreateAccountModal({ isOpen, onClose }: CreateAccountModalProps)
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onClose();
+    if (!name || !balance) return;
+
+    try {
+      await createAccount({
+        name,
+        type,
+        initialBalance: parseFloat(balance) || 0,
+        currency: 'PEN',
+        accountNumber: accountNumber || undefined,
+        workspaceId: activeWorkspaceId || undefined,
+      });
+      setName('');
+      setBalance('');
+      setAccountNumber('');
+      onClose();
+    } catch (err) {
+      console.error('Error al crear cuenta:', err);
+      onClose();
+    }
   };
 
   return (
@@ -104,9 +127,14 @@ export function CreateAccountModal({ isOpen, onClose }: CreateAccountModalProps)
             </button>
             <button
               type="submit"
-              className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors shadow-lg shadow-indigo-600/30"
+              disabled={isPending}
+              className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors shadow-lg shadow-indigo-600/30 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
-              Crear Cuenta
+              {isPending ? (
+                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                'Crear Cuenta'
+              )}
             </button>
           </div>
         </form>
