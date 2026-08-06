@@ -22,81 +22,7 @@ import { formatCurrency } from '@/lib/utils';
 import { WorkspaceType, CategoryType, Transaction } from '@/types/finance';
 import { CreateTransactionModal } from '@/components/modals/create-transaction-modal';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
-
-const mockAllTransactions: Transaction[] = [
-  {
-    id: 'tx-1',
-    title: 'Supermercado Metro / Tottus',
-    category: 'food',
-    categoryLabel: 'Alimentación',
-    amount: 185,
-    currency: 'PEN',
-    date: '05 Aug 2026, 10:30 AM',
-    type: 'expense',
-    workspace: 'couple',
-    paidBy: 'Jorge',
-    splitRatio: '50/50',
-  },
-  {
-    id: 'tx-2',
-    title: 'Servicio de Luz Luz del Sur / Enel',
-    category: 'utilities',
-    categoryLabel: 'Servicios',
-    amount: 120,
-    currency: 'PEN',
-    date: '04 Aug 2026',
-    type: 'expense',
-    workspace: 'couple',
-    paidBy: 'Sofía',
-    splitRatio: '50/50',
-  },
-  {
-    id: 'tx-3',
-    title: 'Suscripción Netflix & Spotify',
-    category: 'entertainment',
-    categoryLabel: 'Entretenimiento',
-    amount: 45,
-    currency: 'PEN',
-    date: '01 Aug 2026',
-    type: 'expense',
-    workspace: 'personal',
-  },
-  {
-    id: 'tx-4',
-    title: 'Transferencia Nómina Empresa',
-    category: 'income',
-    categoryLabel: 'Ingreso',
-    amount: 3800,
-    currency: 'PEN',
-    date: '30 Jul 2026',
-    type: 'income',
-    workspace: 'personal',
-  },
-  {
-    id: 'tx-5',
-    title: 'Cena Restaurante Chifa / Pardos',
-    category: 'food',
-    categoryLabel: 'Alimentación',
-    amount: 95,
-    currency: 'PEN',
-    date: '28 Jul 2026',
-    type: 'expense',
-    workspace: 'couple',
-    paidBy: 'Jorge',
-    splitRatio: '50/50',
-  },
-  {
-    id: 'tx-6',
-    title: 'Mantenimiento Vehículo',
-    category: 'transport',
-    categoryLabel: 'Transporte',
-    amount: 210,
-    currency: 'PEN',
-    date: '25 Jul 2026',
-    type: 'expense',
-    workspace: 'personal',
-  },
-];
+import { useTransactions } from '@/hooks/useTransactions';
 
 const categoryIconMap: Record<CategoryType, React.ComponentType<{ className?: string }>> = {
   food: Utensils,
@@ -115,7 +41,24 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
   const [selectedType, setSelectedType] = useState<'all' | 'income' | 'expense'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const filtered = mockAllTransactions.filter((tx) => {
+  const { data: pageData, isLoading } = useTransactions(0, 50);
+
+  const allTransactions: Transaction[] = pageData?.content
+    ? pageData.content.map((dto) => ({
+        id: dto.id,
+        title: dto.description || 'Sin concepto',
+        category: (dto.categoryName?.toLowerCase() as CategoryType) || 'food',
+        categoryLabel: dto.categoryName || 'General',
+        amount: dto.amount,
+        currency: dto.currency || 'PEN',
+        date: dto.transactionDate ? new Date(dto.transactionDate).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Hoy',
+        type: dto.type === 'INCOME' ? 'income' : 'expense',
+        workspace: 'personal',
+        paidBy: dto.paidByUserName,
+      }))
+    : [];
+
+  const filtered = allTransactions.filter((tx) => {
     const isCoupleWorkspace = hasPartner && workspace === 'couple';
     const matchesWorkspace = isCoupleWorkspace ? tx.workspace === 'couple' : true;
     const matchesSearch = tx.title.toLowerCase().includes(searchTerm.toLowerCase());
@@ -172,7 +115,7 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
         <div className="flex items-center gap-1 bg-gray-900/90 p-1 rounded-xl border border-gray-800 w-full md:w-auto">
           <button
             onClick={() => setSelectedType('all')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               selectedType === 'all' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -180,7 +123,7 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
           </button>
           <button
             onClick={() => setSelectedType('expense')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               selectedType === 'expense' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -188,7 +131,7 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
           </button>
           <button
             onClick={() => setSelectedType('income')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               selectedType === 'income' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
             }`}
           >
@@ -199,59 +142,87 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
 
       {/* Table / List */}
       <div className="rounded-2xl bg-[#0f172a]/90 border border-gray-800/80 overflow-hidden shadow-xl">
-        <div className="divide-y divide-gray-800/60">
-          {filtered.map((tx) => {
-            const CategoryIcon = categoryIconMap[tx.category] || Utensils;
-            const isIncome = tx.type === 'income';
-
-            return (
-              <div
-                key={tx.id}
-                className="flex items-center justify-between p-4 hover:bg-gray-900/40 transition-colors"
+        {isLoading ? (
+          <div className="p-6 space-y-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-16 rounded-xl bg-gray-900/60 animate-pulse border border-gray-800/50" />
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-12 space-y-3">
+            <Receipt className="w-10 h-10 text-gray-500 mx-auto" />
+            <div className="space-y-1">
+              <h3 className="font-bold text-sm text-gray-300">No hay transacciones que mostrar</h3>
+              <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                {searchTerm || selectedType !== 'all'
+                  ? 'Prueba cambiando los filtros de búsqueda.'
+                  : 'Presiona "Registrar Movimiento" para agregar tu primer ingreso o gasto.'}
+              </p>
+            </div>
+            {!searchTerm && selectedType === 'all' && (
+              <button
+                onClick={() => setIsModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs font-semibold hover:bg-indigo-600/30 transition-all cursor-pointer"
               >
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-gray-900 border border-gray-800 text-gray-300">
-                    <CategoryIcon className="w-5 h-5 text-indigo-400" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-white">{tx.title}</span>
-                      {hasPartner && tx.workspace === 'couple' ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
-                          <Users className="w-3 h-3" /> Shared {tx.splitRatio}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-md">
-                          <User className="w-3 h-3" /> Personal
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
-                      <span>{tx.categoryLabel}</span>
-                      <span>•</span>
-                      <span>{tx.date}</span>
-                      {hasPartner && tx.paidBy && (
-                        <>
-                          <span>•</span>
-                          <span className="text-gray-300">Pagado por {tx.paidBy}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <Plus className="w-4 h-4" /> Registrar mi primera transacción
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-800/60">
+            {filtered.map((tx) => {
+              const CategoryIcon = categoryIconMap[tx.category] || Utensils;
+              const isIncome = tx.type === 'income';
 
-                <div className="text-right">
-                  <span className={`font-bold text-base block ${isIncome ? 'text-emerald-400' : 'text-white'}`}>
-                    {isIncome ? '+' : '-'} {formatCurrency(tx.amount, tx.currency)}
-                  </span>
-                  <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full inline-block mt-0.5">
-                    Completado
-                  </span>
+              return (
+                <div
+                  key={tx.id}
+                  className="flex items-center justify-between p-4 hover:bg-gray-900/40 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 rounded-xl bg-gray-900 border border-gray-800 text-gray-300">
+                      <CategoryIcon className="w-5 h-5 text-indigo-400" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-white">{tx.title}</span>
+                        {hasPartner && tx.workspace === 'couple' ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                            <Users className="w-3 h-3" /> Shared {tx.splitRatio}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-md">
+                            <User className="w-3 h-3" /> Personal
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
+                        <span>{tx.categoryLabel}</span>
+                        <span>•</span>
+                        <span>{tx.date}</span>
+                        {hasPartner && tx.paidBy && (
+                          <>
+                            <span>•</span>
+                            <span className="text-gray-300">Pagado por {tx.paidBy}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className={`font-bold text-base block ${isIncome ? 'text-emerald-400' : 'text-white'}`}>
+                      {isIncome ? '+' : '-'} {formatCurrency(tx.amount, tx.currency)}
+                    </span>
+                    <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full inline-block mt-0.5">
+                      Completado
+                    </span>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Modal */}

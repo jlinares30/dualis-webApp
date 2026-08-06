@@ -1,0 +1,39 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { getBudgets, createBudget, deleteBudget, CreateBudgetRequest } from '@/lib/services/budgets-service';
+import { useAuthStore } from '@/lib/stores/useAuthStore';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+
+export function useBudgets() {
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  return useQuery({
+    queryKey: ['budgets', activeWorkspaceId],
+    queryFn: () => getBudgets(activeWorkspaceId || undefined),
+    enabled: isAuthenticated,
+  });
+}
+
+export function useCreateBudget() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (newBudget: CreateBudgetRequest) => createBudget(newBudget),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+}
+
+export function useDeleteBudget() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteBudget(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+}

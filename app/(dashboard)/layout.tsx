@@ -1,20 +1,54 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { WorkspaceType } from '@/types/finance';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+import { useAuthStore } from '@/lib/stores/useAuthStore';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
   const { activeWorkspaceType, setActiveWorkspace, hasPartner } = useWorkspaceStore();
+  const { isAuthenticated, token } = useAuthStore();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (isMounted) {
+      const storedToken = localStorage.getItem('dualis_auth_token');
+      const isDev = process.env.NODE_ENV === 'development';
+      if (!isDev && !isAuthenticated && !token && !storedToken) {
+        router.replace('/login');
+      }
+    }
+  }, [isMounted, isAuthenticated, token, router]);
 
   const currentWorkspace: WorkspaceType = hasPartner ? activeWorkspaceType : 'personal';
+
+  const isDev = process.env.NODE_ENV === 'development';
+
+  // Mostrar un loader mientras se verifica el estado en producción
+  if (!isMounted || (!isDev && !isAuthenticated && !token)) {
+    return (
+      <div className="min-h-screen bg-[#090d16] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-gray-400 font-medium">Verificando sesión...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-[#090d16] text-gray-100 antialiased">

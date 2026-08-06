@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { X, PieChart, AlertCircle } from 'lucide-react';
+import { useCreateBudget } from '@/hooks/useBudgets';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 interface CreateBudgetModalProps {
   isOpen: boolean;
@@ -9,15 +11,34 @@ interface CreateBudgetModalProps {
 }
 
 export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
+  const { mutateAsync: createBudget, isPending } = useCreateBudget();
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+
   const [name, setName] = useState('');
   const [category, setCategory] = useState('food');
   const [limit, setLimit] = useState('');
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onClose();
+    if (!name || !limit) return;
+
+    try {
+      await createBudget({
+        name,
+        categoryId: category,
+        limitAmount: parseFloat(limit) || 0,
+        currency: 'PEN',
+        workspaceId: activeWorkspaceId || undefined,
+      });
+      setName('');
+      setLimit('');
+      onClose();
+    } catch (err) {
+      console.error('Error al crear presupuesto:', err);
+      onClose();
+    }
   };
 
   return (
@@ -92,9 +113,14 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
             </button>
             <button
               type="submit"
-              className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors shadow-lg shadow-indigo-600/30"
+              disabled={isPending}
+              className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors shadow-lg shadow-indigo-600/30 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
-              Crear Presupuesto
+              {isPending ? (
+                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                'Crear Presupuesto'
+              )}
             </button>
           </div>
         </form>

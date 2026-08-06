@@ -15,59 +15,29 @@ import { formatCurrency, cn } from '@/lib/utils';
 import { BudgetCategory } from '@/types/finance';
 import { CreateBudgetModal } from '@/components/modals/create-budget-modal';
 
-const mockBudgetsPage: BudgetCategory[] = [
-  {
-    id: 'b-1',
-    name: 'Mercado y Alimentación',
-    category: 'food',
-    spent: 820,
-    limit: 1000,
-    currency: 'PEN',
-  },
-  {
-    id: 'b-2',
-    name: 'Servicios Públicos & Internet',
-    category: 'utilities',
-    spent: 240,
-    limit: 400,
-    currency: 'PEN',
-  },
-  {
-    id: 'b-3',
-    name: 'Entretenimiento & Restaurantes',
-    category: 'entertainment',
-    spent: 470,
-    limit: 500,
-    currency: 'PEN',
-  },
-  {
-    id: 'b-4',
-    name: 'Transporte & Combustible',
-    category: 'transport',
-    spent: 120,
-    limit: 300,
-    currency: 'PEN',
-  },
-  {
-    id: 'b-5',
-    name: 'Compras & Vestuario',
-    category: 'shopping',
-    spent: 310,
-    limit: 300,
-    currency: 'PEN',
-  },
-];
+import { useBudgets } from '@/hooks/useBudgets';
 
 export default function BudgetsPage() {
-  const [budgets] = useState<BudgetCategory[]>(mockBudgetsPage);
+  const { data: apiBudgets, isLoading } = useBudgets();
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const budgets: BudgetCategory[] = apiBudgets
+    ? apiBudgets.map((b) => ({
+        id: b.id,
+        name: b.name,
+        category: (b.categoryName?.toLowerCase() as any) || 'food',
+        spent: b.spentAmount || 0,
+        limit: b.limitAmount || 1000,
+        currency: b.currency || 'PEN',
+      }))
+    : [];
 
   const totalSpent = budgets.reduce((acc, curr) => acc + curr.spent, 0);
   const totalLimit = budgets.reduce((acc, curr) => acc + curr.limit, 0);
-  const overallPercentage = Math.round((totalSpent / totalLimit) * 100);
+  const overallPercentage = totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0;
 
   const getStatus = (spent: number, limit: number) => {
-    const pct = Math.round((spent / limit) * 100);
+    const pct = limit > 0 ? Math.round((spent / limit) * 100) : 0;
     if (pct >= 100) {
       return { text: 'Excedido', color: 'bg-rose-500', badge: 'bg-rose-500/10 text-rose-400 border-rose-500/20', icon: AlertTriangle };
     }
@@ -130,47 +100,71 @@ export default function BudgetsPage() {
       </div>
 
       {/* Budgets List Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {budgets.map((b) => {
-          const pct = Math.round((b.spent / b.limit) * 100);
-          const status = getStatus(b.spent, b.limit);
-          const StatusIcon = status.icon;
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-36 rounded-2xl bg-[#0f172a]/60 animate-pulse border border-gray-800" />
+          ))}
+        </div>
+      ) : budgets.length === 0 ? (
+        <div className="text-center py-12 rounded-3xl bg-[#0f172a]/40 border border-gray-800/40 border-dashed space-y-3">
+          <PieChart className="w-10 h-10 text-gray-500 mx-auto" />
+          <div className="space-y-1">
+            <h3 className="font-bold text-sm text-gray-300">No tienes presupuestos activos</h3>
+            <p className="text-xs text-gray-500 max-w-sm mx-auto">
+              Crea topes de gasto por categoría como Alimentación o Servicios para evitar sobrecostos.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs font-semibold hover:bg-indigo-600/30 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" /> Crear mi primer presupuesto
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {budgets.map((b) => {
+            const pct = b.limit > 0 ? Math.round((b.spent / b.limit) * 100) : 0;
+            const status = getStatus(b.spent, b.limit);
+            const StatusIcon = status.icon;
 
-          return (
-            <div
-              key={b.id}
-              className="rounded-2xl bg-[#0f172a]/90 border border-gray-800/80 p-5 shadow-lg space-y-4 hover:border-gray-700 transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-base text-white">{b.name}</h3>
-                <div className={cn('flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border', status.badge)}>
-                  <StatusIcon className="w-3.5 h-3.5" />
-                  <span>{status.text}</span>
+            return (
+              <div
+                key={b.id}
+                className="rounded-2xl bg-[#0f172a]/90 border border-gray-800/80 p-5 shadow-lg space-y-4 hover:border-gray-700 transition-all"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-base text-white">{b.name}</h3>
+                  <div className={cn('flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border', status.badge)}>
+                    <StatusIcon className="w-3.5 h-3.5" />
+                    <span>{status.text}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-baseline text-xs">
+                    <span className="text-gray-400">Gastado: <strong className="text-white">{formatCurrency(b.spent, b.currency)}</strong></span>
+                    <span className="text-gray-400">Límite: <strong className="text-gray-300">{formatCurrency(b.limit, b.currency)}</strong></span>
+                  </div>
+
+                  <div className="w-full h-2.5 rounded-full bg-gray-800 overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-full transition-all duration-300', status.color)}
+                      style={{ width: `${Math.min(pct, 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex justify-between items-center text-[11px] text-gray-400">
+                  <span>Disponible: {formatCurrency(Math.max(0, b.limit - b.spent), b.currency)}</span>
+                  <span className="font-semibold text-indigo-400">{pct}% consumido</span>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between items-baseline text-xs">
-                  <span className="text-gray-400">Gastado: <strong className="text-white">{formatCurrency(b.spent, b.currency)}</strong></span>
-                  <span className="text-gray-400">Límite: <strong className="text-gray-300">{formatCurrency(b.limit, b.currency)}</strong></span>
-                </div>
-
-                <div className="w-full h-2.5 rounded-full bg-gray-800 overflow-hidden">
-                  <div
-                    className={cn('h-full rounded-full transition-all duration-300', status.color)}
-                    style={{ width: `${Math.min(pct, 100)}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-between items-center text-[11px] text-gray-400">
-                <span>Disponible: {formatCurrency(Math.max(0, b.limit - b.spent), b.currency)}</span>
-                <span className="font-semibold text-indigo-400">{pct}% consumido</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Modal */}
       <CreateBudgetModal
