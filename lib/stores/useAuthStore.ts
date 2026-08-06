@@ -17,13 +17,13 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       user: null,
       isAuthenticated: false,
-      setAuth: (token, user) => {
+      setAuth: (token: string, user: UserProfile) => {
         if (typeof window !== 'undefined') {
           localStorage.setItem('dualis_auth_token', token);
         }
         set({ token, user, isAuthenticated: true });
       },
-      setUser: (user) => set({ user, isAuthenticated: !!user }),
+      setUser: (user: UserProfile | null) => set({ user, isAuthenticated: !!user }),
       logoutUser: () => {
         logout();
         set({ token: null, user: null, isAuthenticated: false });
@@ -31,7 +31,7 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'dualis-auth-storage',
-      partialize: (state) => ({ token: state.token, user: state.user, isAuthenticated: state.isAuthenticated }),
+      partialize: (state: AuthState) => ({ token: state.token, user: state.user, isAuthenticated: state.isAuthenticated }),
     }
-  )
+  ) as any
 );

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { registerUser } from '@/lib/auth';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
@@ -56,8 +57,14 @@ export default function RegisterPage() {
       <div className="relative w-full max-w-md">
         {/* Logo / Brand Header */}
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="p-3 rounded-2xl bg-gradient-to-tr from-indigo-500 to-emerald-400 text-white shadow-xl shadow-indigo-500/20">
-            <Wallet className="w-8 h-8" />
+          <div className="p-2 rounded-2xl bg-gradient-to-tr from-indigo-950/60 via-gray-900 to-emerald-950/50 border border-indigo-500/20 shadow-xl shadow-indigo-500/10 flex items-center justify-center shrink-0">
+            <Image
+              src="/logo-removebg.png"
+              alt="Dualis Logo"
+              width={40}
+              height={40}
+              className="w-10 h-10 object-contain"
+            />
           </div>
           <div className="text-left">
             <span className="text-2xl font-black tracking-tight text-white block">

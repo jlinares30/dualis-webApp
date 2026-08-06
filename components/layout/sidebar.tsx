@@ -2,20 +2,22 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Wallet, 
-  Receipt, 
-  PieChart, 
+import {
+  LayoutDashboard,
+  Wallet,
+  Receipt,
+  PieChart,
   HeartHandshake,
   Users,
-  Settings, 
+  Settings,
   Sparkles,
   X,
   Menu
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export interface NavItem {
   name: string;
@@ -25,12 +27,12 @@ export interface NavItem {
 
 export const navigationItems: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Cuentas', href: '/cuentas', icon: Wallet },
-  { name: 'Transacciones', href: '/transacciones', icon: Receipt },
-  { name: 'Presupuestos', href: '/presupuestos', icon: PieChart },
-  { name: 'Liquidación', href: '/liquidacion', icon: HeartHandshake },
-  { name: 'Espacios', href: '/espacios', icon: Users },
-  { name: 'Configuración', href: '/configuracion', icon: Settings },
+  { name: 'Cuentas', href: '/accounts', icon: Wallet },
+  { name: 'Transacciones', href: '/transactions', icon: Receipt },
+  { name: 'Presupuestos', href: '/budgets', icon: PieChart },
+  { name: 'Liquidación', href: '/settlements', icon: HeartHandshake },
+  { name: 'Espacios', href: '/workspaces', icon: Users },
+  { name: 'Configuración', href: '/settings', icon: Settings },
 ];
 
 interface SidebarProps {
@@ -40,14 +42,28 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
   const pathname = usePathname();
+  const { hasPartner, partnerName } = useWorkspaceStore();
+
+  const filteredNavItems = navigationItems.filter((item) => {
+    if (!hasPartner && (item.href === '/settlements' || item.href === '/workspaces')) {
+      return false;
+    }
+    return true;
+  });
 
   const navContent = (
     <div className="flex flex-col h-full bg-[#0d1322] border-r border-gray-800/80 text-gray-300 w-64 p-4 transition-all duration-300">
       {/* Brand Header */}
       <div className="flex items-center justify-between px-3 py-4 mb-4 border-b border-gray-800/60">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-emerald-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <Sparkles className="w-5 h-5 text-white" />
+          <div className="p-1 rounded-xl bg-gray-900/90 border border-gray-800 shadow-md flex items-center justify-center shrink-0">
+            <Image
+              src="/logo-removebg.png"
+              alt="Dualis Logo"
+              width={34}
+              height={34}
+              className="w-8 h-8 object-contain"
+            />
           </div>
           <div>
             <span className="font-bold text-lg text-white tracking-wide">Dualis</span>
@@ -65,7 +81,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
 
       {/* Navigation Links */}
       <nav className="flex-1 space-y-1.5">
-        {navigationItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
 
@@ -93,16 +109,25 @@ export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
         })}
       </nav>
 
-      {/* Shared Space Quick Status Card */}
-      <div className="mt-auto p-3.5 rounded-xl bg-gradient-to-br from-indigo-950/40 via-gray-900 to-emerald-950/30 border border-indigo-500/20">
-        <div className="flex items-center gap-2 mb-1.5">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-xs font-medium text-gray-300">Modo Sincronizado</span>
+      {/* Shared Space Status Card */}
+      {hasPartner ? (
+        <div className="mt-auto p-3.5 rounded-xl bg-gradient-to-br from-indigo-950/40 via-gray-900 to-emerald-950/30 border border-indigo-500/20">
+          <div className="flex items-center gap-2 mb-1.5">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-xs font-medium text-gray-300">Sincronizado con {partnerName || 'Pareja'}</span>
+          </div>
+          <p className="text-[11px] text-gray-400 leading-relaxed">
+            Gastos compartidos en tiempo real activos.
+          </p>
         </div>
-        <p className="text-[11px] text-gray-400 leading-relaxed">
-          Tu pareja se conectó hace 15m. 2 gastos pendientes por aprobar.
-        </p>
-      </div>
+      ) : (
+        <div className="mt-auto p-3.5 rounded-xl bg-gray-900/60 border border-gray-800/60 text-center">
+          <span className="block text-xs font-bold text-gray-300">Modo Individual</span>
+          <p className="text-[10px] text-gray-500 mt-0.5">
+            Vincula una pareja en Configuración para activar gastos compartidos.
+          </p>
+        </div>
+      )}
     </div>
   );
 

@@ -19,6 +19,7 @@ import { WorkspaceType } from '@/types/finance';
 import { cn } from '@/lib/utils';
 import { getMe } from '@/lib/auth';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 interface HeaderProps {
   currentWorkspace: WorkspaceType;
@@ -29,6 +30,7 @@ interface HeaderProps {
 export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }: HeaderProps) {
   const router = useRouter();
   const { user, isAuthenticated, logoutUser, setUser } = useAuthStore();
+  const { hasPartner, partnerName } = useWorkspaceStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -52,7 +54,7 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
     {
       id: 'couple' as WorkspaceType,
       name: 'Espacio Pareja',
-      description: 'Gastos compartidos con Sofía',
+      description: `Gastos compartidos con ${partnerName || 'tu pareja'}`,
       icon: HeartHandshake,
       badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     },
@@ -78,69 +80,76 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* Context Switcher Dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 hover:border-gray-700 text-sm font-medium text-gray-200 transition-all duration-200 shadow-sm cursor-pointer"
-          >
-            <div className={cn('p-1 rounded-lg border', activeSpace.badgeColor)}>
-              <ActiveIcon className="w-4 h-4" />
-            </div>
-            <div className="text-left hidden sm:block">
-              <span className="block text-xs font-semibold text-white">{activeSpace.name}</span>
-              <span className="block text-[10px] text-gray-400">Alternar espacio</span>
-            </div>
-            <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform duration-200', dropdownOpen && 'rotate-180')} />
-          </button>
-
-          {dropdownOpen && (
-            <>
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setDropdownOpen(false)} 
-              />
-              <div className="absolute left-0 mt-2 w-72 rounded-2xl bg-[#0f172a] border border-gray-800 shadow-2xl p-2 z-50 animate-in fade-in-50 zoom-in-95">
-                <div className="px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                  Seleccionar Espacio
-                </div>
-                <div className="space-y-1">
-                  {workspaces.map((space) => {
-                    const Icon = space.icon;
-                    const isSelected = space.id === currentWorkspace;
-
-                    return (
-                      <button
-                        key={space.id}
-                        onClick={() => {
-                          onWorkspaceChange(space.id);
-                          setDropdownOpen(false);
-                        }}
-                        className={cn(
-                          'w-full flex items-center justify-between p-2.5 rounded-xl text-left text-sm transition-all cursor-pointer',
-                          isSelected
-                            ? 'bg-indigo-600/15 border border-indigo-500/30 text-white'
-                            : 'hover:bg-gray-800/60 text-gray-300'
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={cn('p-1.5 rounded-lg border', space.badgeColor)}>
-                            <Icon className="w-4 h-4" />
-                          </div>
-                          <div>
-                            <p className="font-medium text-xs text-white">{space.name}</p>
-                            <p className="text-[11px] text-gray-400">{space.description}</p>
-                          </div>
-                        </div>
-                        {isSelected && <Check className="w-4 h-4 text-indigo-400" />}
-                      </button>
-                    );
-                  })}
-                </div>
+        {/* Context Switcher Dropdown (Only visible if user has linked a partner) */}
+        {hasPartner ? (
+          <div className="relative">
+            <button
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 hover:border-gray-700 text-sm font-medium text-gray-200 transition-all duration-200 shadow-sm cursor-pointer"
+            >
+              <div className={cn('p-1 rounded-lg border', activeSpace.badgeColor)}>
+                <ActiveIcon className="w-4 h-4" />
               </div>
-            </>
-          )}
-        </div>
+              <div className="text-left hidden sm:block">
+                <span className="block text-xs font-semibold text-white">{activeSpace.name}</span>
+                <span className="block text-[10px] text-gray-400">Alternar espacio</span>
+              </div>
+              <ChevronDown className={cn('w-4 h-4 text-gray-400 transition-transform duration-200', dropdownOpen && 'rotate-180')} />
+            </button>
+
+            {dropdownOpen && (
+              <>
+                <div 
+                  className="fixed inset-0 z-40" 
+                  onClick={() => setDropdownOpen(false)} 
+                />
+                <div className="absolute left-0 mt-2 w-72 rounded-2xl bg-[#0f172a] border border-gray-800 shadow-2xl p-2 z-50 animate-in fade-in-50 zoom-in-95">
+                  <div className="px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                    Seleccionar Espacio
+                  </div>
+                  <div className="space-y-1">
+                    {workspaces.map((space) => {
+                      const Icon = space.icon;
+                      const isSelected = space.id === currentWorkspace;
+
+                      return (
+                        <button
+                          key={space.id}
+                          onClick={() => {
+                            onWorkspaceChange(space.id);
+                            setDropdownOpen(false);
+                          }}
+                          className={cn(
+                            'w-full flex items-center justify-between p-2.5 rounded-xl text-left text-sm transition-all cursor-pointer',
+                            isSelected
+                              ? 'bg-indigo-600/15 border border-indigo-500/30 text-white'
+                              : 'hover:bg-gray-800/60 text-gray-300'
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={cn('p-1.5 rounded-lg border', space.badgeColor)}>
+                              <Icon className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-xs text-white">{space.name}</p>
+                              <p className="text-[11px] text-gray-400">{space.description}</p>
+                            </div>
+                          </div>
+                          {isSelected && <Check className="w-4 h-4 text-indigo-400" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-900/60 border border-gray-800 text-xs font-semibold text-gray-300">
+            <User className="w-4 h-4 text-blue-400" />
+            <span>Espacio Personal</span>
+          </div>
+        )}
       </div>
 
       {/* Right: Notifications & User Profile */}

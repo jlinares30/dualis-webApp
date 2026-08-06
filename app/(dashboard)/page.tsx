@@ -7,14 +7,16 @@ import { RecentTransactions } from '@/components/dashboard/recent-transactions';
 import { BudgetWidget } from '@/components/dashboard/budget-widget';
 import { CashFlowChart } from '@/components/dashboard/cash-flow-chart';
 import { WorkspaceType } from '@/types/finance';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { HeartHandshake, User, Sparkles } from 'lucide-react';
 
 interface DashboardPageProps {
   workspace?: WorkspaceType;
 }
 
-export default function DashboardPage({ workspace = 'couple' }: DashboardPageProps) {
-  const isCouple = workspace === 'couple';
+export default function DashboardPage({ workspace = 'personal' }: DashboardPageProps) {
+  const { hasPartner, partnerName } = useWorkspaceStore();
+  const isCouple = hasPartner && workspace === 'couple';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -26,15 +28,12 @@ export default function DashboardPage({ workspace = 'couple' }: DashboardPagePro
               <Sparkles className="w-3 h-3" /> Dashboard Financiero
             </span>
             <span className="text-xs font-medium text-gray-400">
-              {isCouple ? 'Espacio Compartido con Sofía' : 'Espacio Personal'}
+              {isCouple ? `Espacio Compartido con ${partnerName || 'tu pareja'}` : 'Espacio Personal'}
             </span>
           </div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-            Hola, Jorge 👋
-          </h1>
           <p className="text-xs md:text-sm text-gray-400">
-            {isCouple 
-              ? 'Aquí tienes el resumen financiero sincronizado de tu vida en pareja.' 
+            {isCouple
+              ? 'Aquí tienes el resumen financiero sincronizado de tu vida en pareja.'
               : 'Resumen consolidado de tus ingresos y gastos personales.'}
           </p>
         </div>
