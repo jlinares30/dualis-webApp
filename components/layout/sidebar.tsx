@@ -9,6 +9,7 @@ import {
   Wallet,
   Receipt,
   PieChart,
+  TrendingUp,
   HeartHandshake,
   Users,
   Settings,
@@ -30,6 +31,7 @@ export const navigationItems: NavItem[] = [
   { name: 'Cuentas', href: '/accounts', icon: Wallet },
   { name: 'Transacciones', href: '/transactions', icon: Receipt },
   { name: 'Presupuestos', href: '/budgets', icon: PieChart },
+  { name: 'Inversiones', href: '/investments', icon: TrendingUp },
   { name: 'Liquidación', href: '/settlements', icon: HeartHandshake },
   { name: 'Espacios', href: '/workspaces', icon: Users },
   { name: 'Configuración', href: '/settings', icon: Settings },
@@ -44,7 +46,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
   const pathname = usePathname();
   const { hasPartner, partnerName } = useWorkspaceStore();
 
-  // Filtrado reactivo dinámico: Solo si el usuario vincula a una pareja se muestran las opciones de pareja
+  // En Modo Personal (!hasPartner), ocultamos Liquidación y Espacios de la navegación lateral.
   const filteredNavItems = navigationItems.filter((item) => {
     if (!hasPartner && (item.href === '/settlements' || item.href === '/workspaces')) {
       return false;

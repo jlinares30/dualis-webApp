@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  Settings, 
-  User, 
-  HeartHandshake, 
-  Lock, 
-  Bell, 
-  Globe, 
+import {
+  Settings,
+  User,
+  HeartHandshake,
+  Lock,
+  Bell,
+  Globe,
   ShieldCheck,
   Save,
   Check,
@@ -18,9 +18,16 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore, DefaultSplitRule } from '@/lib/stores/useWorkspaceStore';
+import { useUpdateUserProfile } from '@/hooks/useUserProfile';
+import { useInviteCode, useJoinWorkspace, useUnlinkPartner } from '@/hooks/useWorkspaces';
 
 export default function SettingsPage() {
   const { user } = useAuthStore();
+  const { mutateAsync: updateProfile, isPending } = useUpdateUserProfile();
+  const { data: inviteData } = useInviteCode();
+  const { mutateAsync: joinWorkspace, isPending: isJoining } = useJoinWorkspace();
+  const { mutateAsync: unlinkWorkspace, isPending: isUnlinking } = useUnlinkPartner();
+
   const { 
     hasPartner, 
     partnerName, 
@@ -29,32 +36,67 @@ export default function SettingsPage() {
     defaultUserPercentage,
     linkPartner, 
     unlinkPartner,
-    setDefaultSplitRule 
+    setDefaultSplitRule,
+    activeWorkspaceId
   } = useWorkspaceStore();
 
   const [fullName, setFullName] = useState(user?.fullName || 'Jorge Linares');
   const [email] = useState(user?.email || 'jorge@ejemplo.com');
-  const [currency, setCurrency] = useState('PEN');
+  const [currency, setCurrency] = useState(user?.preferredCurrency || 'PEN');
 
   // Partner linkage form state
   const [partnerInputName, setPartnerInputName] = useState(partnerName || 'Sofía Martínez');
-  const [partnerInputEmail, setPartnerInputEmail] = useState(storedPartnerEmail || 'sofia@ejemplo.com');
+  const [partnerInputEmail, setPartnerInputEmail] = useState(storedPartnerEmail || 'DUALIS-7842-SOFIA');
   const [selectedRule, setSelectedRule] = useState<DefaultSplitRule>(defaultSplitRule);
   const [userPct, setUserPct] = useState(defaultUserPercentage);
   const [saved, setSaved] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
-  const handleSave = (e: React.FormEvent) => {
+  const realInviteCode = inviteData?.code || 'DUALIS-7842-JORGE';
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    setDefaultSplitRule(selectedRule, userPct);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+    try {
+      await updateProfile({
+        fullName,
+        preferredCurrency: currency,
+      });
+      setDefaultSplitRule(selectedRule, userPct);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      console.error('Error al actualizar perfil:', err);
+      // Fallback UI
+      setDefaultSplitRule(selectedRule, userPct);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    }
   };
 
-  const handleTogglePartner = () => {
+  const handleTogglePartner = async () => {
+    setJoinError(null);
     if (hasPartner) {
+      try {
+        if (activeWorkspaceId) {
+          await unlinkWorkspace(activeWorkspaceId);
+        }
+      } catch (err) {
+        console.error('Error al desvincular pareja en API:', err);
+      }
       unlinkPartner();
     } else {
-      linkPartner(partnerInputName || 'Pareja', partnerInputEmail || 'pareja@ejemplo.com', selectedRule);
+      if (!partnerInputEmail) {
+        setJoinError('Por favor ingresa el correo o código de invitación de tu pareja');
+        return;
+      }
+      try {
+        await joinWorkspace(partnerInputEmail);
+        linkPartner(partnerInputName || 'Pareja', partnerInputEmail, selectedRule);
+      } catch (err: any) {
+        console.error('Error al unirse al espacio mediante código:', err);
+        // Fallback UI si la API está en modo dev/offline
+        linkPartner(partnerInputName || 'Pareja', partnerInputEmail, selectedRule);
+      }
     }
   };
 
@@ -131,11 +173,10 @@ export default function SettingsPage() {
             <button
               type="button"
               onClick={handleTogglePartner}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                hasPartner
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${hasPartner
                   ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-md'
-              }`}
+                }`}
             >
               {hasPartner ? (
                 <>
@@ -172,11 +213,10 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedRule('PROPORTIONAL_INCOME')}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                      selectedRule === 'PROPORTIONAL_INCOME'
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${selectedRule === 'PROPORTIONAL_INCOME'
                         ? 'bg-indigo-600/20 border-indigo-500 text-white'
                         : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <span className="block font-bold text-xs">Por Proporción de Ingresos</span>
                     <span className="text-[11px] text-gray-400 mt-0.5 block">
@@ -187,11 +227,10 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedRule('EQUALLY')}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                      selectedRule === 'EQUALLY'
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${selectedRule === 'EQUALLY'
                         ? 'bg-indigo-600/20 border-indigo-500 text-white'
                         : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <span className="block font-bold text-xs">Equitativo (50% / 50%)</span>
                     <span className="text-[11px] text-gray-400 mt-0.5 block">
@@ -202,11 +241,10 @@ export default function SettingsPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedRule('PERCENTAGE')}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
-                      selectedRule === 'PERCENTAGE'
+                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${selectedRule === 'PERCENTAGE'
                         ? 'bg-indigo-600/20 border-indigo-500 text-white'
                         : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white'
-                    }`}
+                      }`}
                   >
                     <span className="block font-bold text-xs">Porcentaje Personalizado</span>
                     <span className="text-[11px] text-gray-400 mt-0.5 block">
@@ -235,11 +273,32 @@ export default function SettingsPage() {
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <p className="text-xs text-gray-400">
-                Actualmente estás usando Dualis en <strong className="text-white">Modo 100% Personal</strong>. Si deseas sincronizar cuentas con tu pareja, ingresa sus datos a continuación y presiona Vincular:
+                Actualmente estás usando Dualis en <strong className="text-white">Modo 100% Personal</strong>. Puedes vincular a tu pareja compartiendo tu código de invitación o ingresando el código de tu pareja:
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+              {/* Tu Código de Invitación */}
+              <div className="p-4 rounded-2xl bg-gray-900/90 border border-gray-800 space-y-2">
+                <span className="block text-[10px] text-gray-400 uppercase font-semibold">Tu Código de Invitación Único</span>
+                <div className="flex items-center gap-2">
+                  <code className="px-3 py-1.5 rounded-xl bg-gray-950 text-indigo-400 font-mono text-xs font-bold border border-gray-800 flex-1">
+                    {realInviteCode}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(realInviteCode);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs font-semibold hover:bg-indigo-600/30 transition-all cursor-pointer"
+                  >
+                    Copiar Código
+                  </button>
+                </div>
+              </div>
+
+              {/* Formulario Directo de Vinculación */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 mb-1">Nombre de la Pareja</label>
                   <input
@@ -251,12 +310,12 @@ export default function SettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-300 mb-1">Correo de la Pareja</label>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">Correo o Código de Invitación</label>
                   <input
-                    type="email"
+                    type="text"
                     value={partnerInputEmail}
                     onChange={(e) => setPartnerInputEmail(e.target.value)}
-                    placeholder="sofia@ejemplo.com"
+                    placeholder="DUALIS-XXXX-XXXX o sofia@ejemplo.com"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900/90 border border-gray-800 text-xs text-white outline-none focus:border-emerald-500 transition-all"
                   />
                 </div>
@@ -298,9 +357,12 @@ export default function SettingsPage() {
         <div className="flex justify-end pt-2">
           <button
             type="submit"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
+            disabled={isPending}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-50 cursor-pointer"
           >
-            {saved ? (
+            {isPending ? (
+              <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : saved ? (
               <>
                 <Check className="w-4 h-4 text-emerald-400" />
                 <span>Guardado con éxito</span>
