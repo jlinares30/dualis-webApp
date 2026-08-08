@@ -8,6 +8,8 @@ import { WorkspaceType } from '@/types/finance';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 
+import { useWorkspaces } from '@/hooks/useWorkspaces';
+
 export default function DashboardLayout({
   children,
 }: {
@@ -17,12 +19,16 @@ export default function DashboardLayout({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
+  // Inicializar consulta de workspaces del usuario para que el store tenga un UUID de workspace válido
+  useWorkspaces();
+
   const { activeWorkspaceType, setActiveWorkspace, hasPartner } = useWorkspaceStore();
   const { isAuthenticated, token } = useAuthStore();
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
 
   useEffect(() => {
     if (isMounted) {

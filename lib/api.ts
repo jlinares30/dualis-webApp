@@ -45,14 +45,39 @@ export async function apiFetch<T>(
       localStorage.removeItem('dualis_auth_token');
     }
 
+
+
+    let errorMessage = `HTTP Error ${response.status}`;
+    if (errorData) {
+      if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else if (errorData.details && typeof errorData.details === 'object') {
+        errorMessage = Object.entries(errorData.details)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join('; ');
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.error) {
+        errorMessage = errorData.error;
+      } else if (Array.isArray(errorData.errors)) {
+        errorMessage = errorData.errors.map((e: any) => e.defaultMessage || e.message || JSON.stringify(e)).join(', ');
+      } else if (typeof errorData === 'object') {
+        errorMessage = Object.entries(errorData)
+          .map(([k, v]) => `${k}: ${v}`)
+          .join('; ');
+      }
+    }
+
+
     throw new ApiError(
       response.status,
-      errorData?.message || `HTTP Error ${response.status}`,
+      errorMessage,
       errorData
     );
+
   }
 
-  if (response.status === 24 || response.headers.get('content-length') === '0') {
+  if (response.status === 204 || response.headers.get('content-length') === '0') {
     return {} as T;
   }
 

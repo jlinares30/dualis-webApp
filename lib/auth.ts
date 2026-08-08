@@ -1,22 +1,26 @@
 import { apiFetch } from './api';
 
-export interface AuthResponse {
-  token: string;
+export interface BackendAuthResponse {
+  accessToken: string;
+  tokenType: string;
+  userId: string;
   email: string;
-  name: string;
-  id: string;
+  firstName: string;
+  lastName: string;
+  role?: string;
 }
 
 export interface LoginRequest {
   email: string;
-  passwordHash: string; // O password según la convención del backend
+  password: string;
 }
 
 export interface RegisterRequest {
   email: string;
-  passwordHash: string;
-  fullName: string;
-  preferredCurrency?: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  baseCurrency?: string;
 }
 
 export interface UserProfile {
@@ -26,36 +30,69 @@ export interface UserProfile {
   preferredCurrency: string;
 }
 
-export async function loginUser(data: { email: string; password?: string; passwordHash?: string }): Promise<AuthResponse> {
-  const payload = {
+export interface AuthResponse {
+  token: string;
+  email: string;
+  name: string;
+  id: string;
+}
+
+export async function loginUser(data: LoginRequest): Promise<AuthResponse> {
+  const payload: LoginRequest = {
     email: data.email,
-    password: data.password || data.passwordHash,
-    passwordHash: data.passwordHash || data.password,
+    password: data.password,
   };
-  
-  const response = await apiFetch<AuthResponse>('/auth/login', {
+
+  const response = await apiFetch<BackendAuthResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 
-  if (response.token && typeof window !== 'undefined') {
-    localStorage.setItem('dualis_auth_token', response.token);
+  const authResponse: AuthResponse = {
+    token: response.accessToken,
+    email: response.email,
+    name: `${response.firstName || ''} ${response.lastName || ''}`.trim() || response.email,
+    id: response.userId,
+  };
+
+  if (authResponse.token && typeof window !== 'undefined') {
+    localStorage.setItem('dualis_auth_token', authResponse.token);
   }
 
-  return response;
+  return authResponse;
 }
 
-export async function registerUser(data: RegisterRequest): Promise<AuthResponse> {
-  const response = await apiFetch<AuthResponse>('/auth/register', {
+export async function registerUser(data: { email: string; password: string; fullName: string; baseCurrency?: string }): Promise<AuthResponse> {
+  const parts = data.fullName.trim().split(' ');
+  const firstName = parts[0] || 'Usuario';
+  const lastName = parts.slice(1).join(' ') || firstName;
+
+  const payload: RegisterRequest = {
+    email: data.email,
+    password: data.password,
+    firstName,
+    lastName,
+    baseCurrency: data.baseCurrency || 'PEN',
+  };
+
+  const response = await apiFetch<BackendAuthResponse>('/auth/register', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
 
-  if (response.token && typeof window !== 'undefined') {
-    localStorage.setItem('dualis_auth_token', response.token);
+  const authResponse: AuthResponse = {
+    token: response.accessToken,
+    email: response.email,
+    name: `${response.firstName || ''} ${response.lastName || ''}`.trim() || response.email,
+    id: response.userId,
+  };
+
+  if (authResponse.token && typeof window !== 'undefined') {
+    localStorage.setItem('dualis_auth_token', authResponse.token);
   }
 
-  return response;
+
+  return authResponse;
 }
 
 export async function getMe(): Promise<UserProfile> {

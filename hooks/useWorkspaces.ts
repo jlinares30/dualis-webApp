@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   getUserWorkspaces, 
+  createWorkspace,
   getInviteCode, 
   joinWorkspaceByCode, 
   unlinkPartnerWorkspace 
@@ -9,29 +10,56 @@ import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function useWorkspaces() {
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  const { isAuthenticated, user } = useAuthStore();
   const setWorkspaces = useWorkspaceStore((state) => state.setWorkspaces);
 
   return useQuery({
-    queryKey: ['workspaces'],
+    queryKey: ['workspaces', user?.email],
     queryFn: async () => {
-      const data = await getUserWorkspaces();
+      let data = await getUserWorkspaces(user?.email || undefined);
+      
+      // Si el usuario es nuevo y no tiene ningún workspace creado aún en la BD:
+      if (data.length === 0 && user?.email) {
+        try {
+          const defaultWorkspace = await createWorkspace({
+            name: 'Espacio Personal',
+            description: 'Espacio de finanzas personales',
+            type: 'INDIVIDUAL',
+            currency: 'PEN',
+            ownerEmail: user.email,
+          });
+          data = [defaultWorkspace];
+        } catch (e) {
+          console.error('Error al autocrear espacio personal:', e);
+        }
+      }
+
       setWorkspaces(data);
       return data;
     },
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && Boolean(user?.email),
   });
 }
+
+
 
 export function useInviteCode() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const activeWorkspaceType = useWorkspaceStore((state) => state.activeWorkspaceType);
+
+  const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
+  const isCoupleWorkspace = activeWorkspaceType === 'COUPLE' || activeWorkspaceType === 'couple';
 
   return useQuery({
-    queryKey: ['inviteCode'],
-    queryFn: () => getInviteCode(),
-    enabled: isAuthenticated,
+    queryKey: ['inviteCode', activeWorkspaceId],
+    queryFn: () => getInviteCode(activeWorkspaceId!),
+    enabled: isAuthenticated && Boolean(isValidUuid) && isCoupleWorkspace,
   });
 }
+
+
 
 export function useJoinWorkspace() {
   const queryClient = useQueryClient();

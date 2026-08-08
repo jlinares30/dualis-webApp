@@ -14,32 +14,40 @@ export function SummaryCards({ workspace }: SummaryCardsProps) {
   const isCouple = workspace === 'couple';
   const { data, isLoading } = useDashboardSummary();
 
+  const savingsRate = data?.savingsRatePercentage ?? data?.savingsRate ?? 0;
+  const totalBalance = data?.totalBalance ?? data?.totalLiquidity ?? 0;
+  const netSavings = data?.netSavings ?? 0;
+  const monthlyExpenses = data?.monthlyExpenses ?? 0;
+  const monthlyIncome = data?.monthlyIncome ?? 0;
+  const exceededCount = data?.exceededBudgetsCount ?? 0;
+  const currency = data?.currency || 'PEN';
+
   const metrics = [
     {
       title: 'Total Disponible',
-      amount: data ? data.totalLiquidity : 0,
-      change: data ? `${data.savingsRate.toFixed(1)}%` : '0%',
+      amount: totalBalance,
+      change: `${savingsRate.toFixed(1)}%`,
       isPositive: true,
       icon: Wallet,
       gradient: 'from-emerald-500/10 via-emerald-500/5 to-transparent',
       borderColor: 'border-emerald-500/20',
       iconBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      subtext: data ? `Ahorro neto: ${formatCurrency(data.netSavings, data.currency || 'PEN')}` : 'Sin cuentas registradas',
+      subtext: data ? `Ahorro neto: ${formatCurrency(netSavings, currency)}` : 'Sin cuentas registradas',
     },
     {
       title: 'Gastos del Mes',
-      amount: data ? data.monthlyExpenses : 0,
-      change: data ? `Ingresos: ${formatCurrency(data.monthlyIncome, data.currency || 'PEN')}` : 'S/ 0.00',
+      amount: monthlyExpenses,
+      change: `Ingresos: ${formatCurrency(monthlyIncome, currency)}`,
       isPositive: true,
       icon: TrendingDown,
       gradient: 'from-rose-500/10 via-rose-500/5 to-transparent',
       borderColor: 'border-rose-500/20',
       iconBg: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-      subtext: data ? `${data.exceededBudgetsCount} presupuestos excedidos` : 'Sin gastos registrados este mes',
+      subtext: data ? `${exceededCount} presupuestos excedidos` : 'Sin gastos registrados este mes',
     },
     {
       title: 'Ingresos del Mes',
-      amount: data ? data.monthlyIncome : 0,
+      amount: monthlyIncome,
       change: '0%',
       isPositive: true,
       icon: Users,
@@ -49,6 +57,7 @@ export function SummaryCards({ workspace }: SummaryCardsProps) {
       subtext: 'Acumulado mensual de ingresos',
     },
   ];
+
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

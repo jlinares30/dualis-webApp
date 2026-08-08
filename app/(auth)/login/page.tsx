@@ -28,22 +28,25 @@ export default function LoginPage() {
         password,
       });
 
-      if (response.token) {
+      if (response && response.token) {
         setAuth(response.token, {
-          id: response.id,
-          email: response.email,
-          fullName: response.name,
+          id: response.id || 'user-id',
+          email: response.email || email,
+          fullName: response.name || email.split('@')[0],
           preferredCurrency: 'PEN',
         });
-      }
 
-      router.push('/');
+        router.replace('/');
+      } else {
+        throw new Error('No se recibió token de autenticación.');
+      }
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión. Por favor verifica tus credenciales.');
     } finally {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#090d16] p-4 relative overflow-hidden">
@@ -96,7 +99,8 @@ export default function LoginPage() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
+
             <div>
               <label className="block text-xs font-semibold text-gray-300 mb-1.5">
                 Correo Electrónico

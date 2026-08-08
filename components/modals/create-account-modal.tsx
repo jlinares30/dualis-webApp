@@ -25,14 +25,21 @@ export function CreateAccountModal({ isOpen, onClose }: CreateAccountModalProps)
     e.preventDefault();
     if (!name || !balance) return;
 
+    const accountTypeMap: Record<string, string> = {
+      bank: 'BANK',
+      digital: 'BANK',
+      credit: 'CREDIT_CARD',
+      cash: 'CASH',
+    };
+
     try {
       await createAccount({
+        workspaceId: activeWorkspaceId!,
         name,
-        type,
-        initialBalance: parseFloat(balance) || 0,
+        type: accountTypeMap[type] || 'BANK',
+        balance: parseFloat(balance) || 0,
         currency: 'PEN',
-        accountNumber: accountNumber || undefined,
-        workspaceId: activeWorkspaceId || undefined,
+        description: accountNumber ? `Cuenta termina en ${accountNumber}` : undefined,
       });
       setName('');
       setBalance('');
@@ -42,6 +49,7 @@ export function CreateAccountModal({ isOpen, onClose }: CreateAccountModalProps)
       console.error('Error al crear cuenta:', err);
       onClose();
     }
+
   };
 
   return (

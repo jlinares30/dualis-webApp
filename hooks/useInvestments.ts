@@ -1,18 +1,24 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getInvestments, createInvestment, deleteInvestment, CreateInvestmentRequest } from '@/lib/services/investments-service';
+import { getInvestments, createInvestment, deleteInvestment, CreateInvestmentRequest, InvestmentDTO } from '@/lib/services/investments-service';
+
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
+
 export function useInvestments() {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
-  return useQuery({
+  return useQuery<InvestmentDTO[]>({
     queryKey: ['investments', activeWorkspaceId],
-    queryFn: () => getInvestments(activeWorkspaceId || undefined),
-    enabled: isAuthenticated,
+    queryFn: async () => {
+      // El backend Java no expone aún módulo /investments, retornamos mock/empty seguro
+      return [];
+    },
+    enabled: true,
   });
 }
+
+
 
 export function useCreateInvestment() {
   const queryClient = useQueryClient();

@@ -26,10 +26,11 @@ export default function RegisterPage() {
     try {
       const response = await registerUser({
         email,
-        passwordHash: password,
+        password,
         fullName,
-        preferredCurrency: 'COP',
+        baseCurrency: 'COP',
       });
+
 
       if (response.token) {
         setAuth(response.token, {
@@ -99,7 +100,8 @@ export default function RegisterPage() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
+
             <div>
               <label className="block text-xs font-semibold text-gray-300 mb-1.5">
                 Nombre Completo

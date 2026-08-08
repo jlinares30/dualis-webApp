@@ -12,25 +12,35 @@ export interface AccountDTO {
 }
 
 export interface CreateAccountRequest {
+  workspaceId: string;
   name: string;
-  type: string;
-  initialBalance: number;
+  type: 'BANK' | 'CASH' | 'CREDIT_CARD' | 'INVESTMENT' | 'SAVINGS' | 'LOAN' | string;
+  balance: number;
+  initialBalance?: number;
   currency?: string;
-  accountNumber?: string;
-  workspaceId?: string;
+  description?: string;
 }
 
-export async function getAccounts(workspaceId?: string): Promise<AccountDTO[]> {
-  const queryParam = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
-  return apiFetch<AccountDTO[]>(`/accounts${queryParam}`);
+export async function getAccounts(workspaceId: string): Promise<AccountDTO[]> {
+  return apiFetch<AccountDTO[]>(`/accounts?workspaceId=${encodeURIComponent(workspaceId)}`);
 }
 
 export async function createAccount(data: CreateAccountRequest): Promise<AccountDTO> {
+  const payload = {
+    workspaceId: data.workspaceId,
+    name: data.name,
+    type: data.type.toUpperCase(),
+    balance: data.balance ?? data.initialBalance ?? 0,
+    currency: data.currency || 'PEN',
+    description: data.description || '',
+  };
+
   return apiFetch<AccountDTO>('/accounts', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
 }
+
 
 export async function updateAccount(id: string, data: Partial<CreateAccountRequest>): Promise<AccountDTO> {
   return apiFetch<AccountDTO>(`/accounts/${id}`, {

@@ -29,10 +29,11 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
       if (isRegister) {
         await registerUser({
           email,
-          passwordHash: password,
+          password,
           fullName,
-          preferredCurrency: 'COP',
+          baseCurrency: 'COP',
         });
+
       } else {
         await loginUser({
           email,

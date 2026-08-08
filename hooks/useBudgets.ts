@@ -7,11 +7,14 @@ export function useBudgets() {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
+  const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
+
   return useQuery({
     queryKey: ['budgets', activeWorkspaceId],
-    queryFn: () => getBudgets(activeWorkspaceId || undefined),
-    enabled: isAuthenticated,
+    queryFn: () => getBudgets(activeWorkspaceId!),
+    enabled: isAuthenticated && Boolean(isValidUuid),
   });
+
 }
 
 export function useCreateBudget() {
