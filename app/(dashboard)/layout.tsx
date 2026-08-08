@@ -27,8 +27,7 @@ export default function DashboardLayout({
   useEffect(() => {
     if (isMounted) {
       const storedToken = localStorage.getItem('dualis_auth_token');
-      const isDev = process.env.NODE_ENV === 'development';
-      if (!isDev && !isAuthenticated && !token && !storedToken) {
+      if (!isAuthenticated && !token && !storedToken) {
         router.replace('/login');
       }
     }
@@ -36,10 +35,8 @@ export default function DashboardLayout({
 
   const currentWorkspace: WorkspaceType = hasPartner ? activeWorkspaceType : 'personal';
 
-  const isDev = process.env.NODE_ENV === 'development';
-
-  // Mostrar un loader mientras se verifica el estado en producción
-  if (!isMounted || (!isDev && !isAuthenticated && !token)) {
+  // Mostrar un loader mientras se verifica el estado de sesión
+  if (!isMounted || (!isAuthenticated && !token && (typeof window !== 'undefined' && !localStorage.getItem('dualis_auth_token')))) {
     return (
       <div className="min-h-screen bg-[#090d16] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
@@ -49,6 +46,7 @@ export default function DashboardLayout({
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen flex bg-[#090d16] text-gray-100 antialiased">
