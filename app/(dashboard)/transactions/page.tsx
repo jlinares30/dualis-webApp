@@ -40,8 +40,10 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'income' | 'expense'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const pageSize = 15;
 
-  const { data: pageData, isLoading } = useTransactions(0, 50);
+  const { data: pageData, isLoading } = useTransactions(currentPage, pageSize);
 
   const allTransactions: Transaction[] = pageData?.content
     ? pageData.content.map((dto) => ({
@@ -65,6 +67,8 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
     const matchesType = selectedType === 'all' || tx.type === selectedType;
     return matchesWorkspace && matchesSearch && matchesType;
   });
+
+  const totalPages = pageData?.totalPages || 1;
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -223,6 +227,31 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
             })}
           </div>
         )}
+
+        {/* Paginador */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between p-4 border-t border-gray-800/80 bg-gray-900/30 text-xs">
+            <span className="text-gray-400">
+              Página <strong className="text-white">{currentPage + 1}</strong> de <strong className="text-white">{totalPages}</strong>
+            </span>
+            <div className="flex gap-2">
+              <button
+                disabled={currentPage === 0}
+                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                className="px-3 py-1 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 disabled:opacity-50 hover:bg-gray-700 transition cursor-pointer"
+              >
+                Anterior
+              </button>
+              <button
+                disabled={currentPage >= totalPages - 1}
+                onClick={() => setCurrentPage((p) => p + 1)}
+                className="px-3 py-1 rounded-lg bg-gray-800 border border-gray-700 text-gray-300 disabled:opacity-50 hover:bg-gray-700 transition cursor-pointer"
+              >
+                Siguiente
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal */}
@@ -233,3 +262,4 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
     </div>
   );
 }
+

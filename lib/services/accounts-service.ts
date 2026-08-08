@@ -32,8 +32,16 @@ export async function createAccount(data: CreateAccountRequest): Promise<Account
   });
 }
 
+export async function updateAccount(id: string, data: Partial<CreateAccountRequest>): Promise<AccountDTO> {
+  return apiFetch<AccountDTO>(`/accounts/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function deleteAccount(id: string): Promise<void> {
   return apiFetch<void>(`/accounts/${id}`, {
     method: 'DELETE',
   });
 }
+

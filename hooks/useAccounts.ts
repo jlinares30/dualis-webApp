@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAccounts, createAccount, deleteAccount, CreateAccountRequest } from '@/lib/services/accounts-service';
+import { getAccounts, createAccount, updateAccount, deleteAccount, CreateAccountRequest } from '@/lib/services/accounts-service';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
@@ -26,6 +26,18 @@ export function useCreateAccount() {
   });
 }
 
+export function useUpdateAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateAccountRequest> }) => updateAccount(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+}
+
 export function useDeleteAccount() {
   const queryClient = useQueryClient();
 
@@ -37,3 +49,4 @@ export function useDeleteAccount() {
     },
   });
 }
+

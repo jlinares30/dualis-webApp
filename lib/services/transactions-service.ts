@@ -30,8 +30,16 @@ export async function createTransaction(data: CreateTransactionRequest): Promise
   });
 }
 
+export async function updateTransaction(id: string, data: Partial<CreateTransactionRequest>): Promise<TransactionDTO> {
+  return apiFetch<TransactionDTO>(`/transactions/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
 export async function deleteTransaction(id: string): Promise<void> {
   return apiFetch<void>(`/transactions/${id}`, {
     method: 'DELETE',
   });
 }
+
