@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   getUserWorkspaces, 
   createWorkspace,
+  updateWorkspace,
+  UpdateWorkspacePayload,
   getInviteCode, 
   joinWorkspaceByCode, 
   unlinkPartnerWorkspace 
@@ -42,7 +44,17 @@ export function useWorkspaces() {
   });
 }
 
+export function useUpdateWorkspace() {
+  const queryClient = useQueryClient();
 
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateWorkspacePayload }) => updateWorkspace(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+}
 
 export function useInviteCode() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -59,13 +71,12 @@ export function useInviteCode() {
   });
 }
 
-
-
 export function useJoinWorkspace() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (code: string) => joinWorkspaceByCode(code),
+    mutationFn: ({ code, partnerEmail }: { code: string; partnerEmail: string }) => 
+      joinWorkspaceByCode(code, partnerEmail),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
@@ -84,3 +95,4 @@ export function useUnlinkPartner() {
     },
   });
 }
+

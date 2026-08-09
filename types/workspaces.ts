@@ -5,7 +5,9 @@ export interface WorkspaceDTO {
   name: string;
   type: 'INDIVIDUAL' | 'COUPLE';
   description?: string;
+  invitationCode?: string;
   inviteCode?: string;
+  currency?: string;
   members?: WorkspaceMemberDTO[];
   createdAt?: string;
   updatedAt?: string;

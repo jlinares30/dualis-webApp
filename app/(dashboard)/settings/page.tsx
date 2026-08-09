@@ -19,7 +19,8 @@ import {
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore, DefaultSplitRule } from '@/lib/stores/useWorkspaceStore';
 import { useUpdateUserProfile } from '@/hooks/useUserProfile';
-import { useInviteCode, useJoinWorkspace, useUnlinkPartner } from '@/hooks/useWorkspaces';
+import { useInviteCode, useJoinWorkspace, useUnlinkPartner, useUpdateWorkspace } from '@/hooks/useWorkspaces';
+import { useCreateSplitRule } from '@/hooks/useSplitRules';
 
 export default function SettingsPage() {
   const { user } = useAuthStore();
@@ -27,6 +28,8 @@ export default function SettingsPage() {
   const { data: inviteData } = useInviteCode();
   const { mutateAsync: joinWorkspace, isPending: isJoining } = useJoinWorkspace();
   const { mutateAsync: unlinkWorkspace, isPending: isUnlinking } = useUnlinkPartner();
+  const { mutateAsync: updateWorkspaceMut } = useUpdateWorkspace();
+  const { mutateAsync: createSplitRuleMut } = useCreateSplitRule();
 
   const { 
     hasPartner, 
@@ -61,6 +64,38 @@ export default function SettingsPage() {
         fullName,
         preferredCurrency: currency,
       });
+
+      if (activeWorkspaceId) {
+        try {
+          await updateWorkspaceMut({
+            id: activeWorkspaceId,
+            data: { currency },
+          });
+        } catch (wErr) {
+          console.error('Error al actualizar workspace en API:', wErr);
+        }
+
+        if (hasPartner) {
+          try {
+            const apiSplitType = selectedRule === 'PROPORTIONAL_INCOME' ? 'PROPORTIONAL'
+              : selectedRule === 'EQUALLY' ? 'EQUAL'
+              : selectedRule === 'PERCENTAGE' ? 'CUSTOM_PERCENTAGE'
+              : 'EQUAL';
+
+            await createSplitRuleMut({
+              workspaceId: activeWorkspaceId,
+              name: `Regla por defecto ${selectedRule}`,
+              splitType: apiSplitType,
+              partnerAPercentage: userPct,
+              partnerBPercentage: 100 - userPct,
+              isDefault: true,
+            });
+          } catch (ruleErr) {
+            console.error('Error al guardar regla de división en API:', ruleErr);
+          }
+        }
+      }
+
       setDefaultSplitRule(selectedRule, userPct);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -90,7 +125,10 @@ export default function SettingsPage() {
         return;
       }
       try {
-        await joinWorkspace(partnerInputEmail);
+        await joinWorkspace({
+          code: partnerInputEmail,
+          partnerEmail: user?.email || email,
+        });
         linkPartner(partnerInputName || 'Pareja', partnerInputEmail, selectedRule);
       } catch (err: any) {
         console.error('Error al unirse al espacio mediante código:', err);
