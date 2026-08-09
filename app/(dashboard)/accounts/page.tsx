@@ -79,7 +79,7 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
     ? apiAccounts.map((a) => ({
         id: a.id,
         name: a.name,
-        type: a.type || 'bank',
+        type: (a.type?.toLowerCase() as any) || 'bank',
         balance: a.balance,
         currency: a.currency || 'PEN',
         accountNumber: a.accountNumber,

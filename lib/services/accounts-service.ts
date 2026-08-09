@@ -3,10 +3,11 @@ import { apiFetch } from '../api';
 export interface AccountDTO {
   id: string;
   name: string;
-  type: 'bank' | 'cash' | 'credit' | 'digital';
+  type: string;
   balance: number;
   currency: string;
   accountNumber?: string;
+  description?: string;
   color?: string;
   workspaceId?: string;
 }

@@ -4,36 +4,17 @@ import React, { useState } from 'react';
 import { 
   Receipt, 
   Search, 
-  Filter, 
   Plus, 
-  ArrowDownLeft, 
-  ArrowUpRight, 
-  Utensils, 
-  Zap, 
-  Tv, 
-  Home, 
-  Car, 
-  ShoppingBag, 
   Users, 
   User,
   Download
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { WorkspaceType, CategoryType, Transaction } from '@/types/finance';
+import { WorkspaceType, Transaction } from '@/types/finance';
 import { CreateTransactionModal } from '@/components/modals/create-transaction-modal';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useTransactions } from '@/hooks/useTransactions';
-
-const categoryIconMap: Record<CategoryType, React.ComponentType<{ className?: string }>> = {
-  food: Utensils,
-  utilities: Zap,
-  entertainment: Tv,
-  housing: Home,
-  transport: Car,
-  shopping: ShoppingBag,
-  health: ShoppingBag,
-  income: ArrowDownLeft,
-};
+import { getTransactionIconAndStyle } from '@/lib/transaction-icons';
 
 export default function TransactionsPage({ workspace = 'personal' }: { workspace?: WorkspaceType }) {
   const { hasPartner } = useWorkspaceStore();
@@ -49,7 +30,7 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
     ? pageData.content.map((dto) => ({
         id: dto.id,
         title: dto.description || 'Sin concepto',
-        category: (dto.categoryName?.toLowerCase() as CategoryType) || 'food',
+        category: (dto.categoryName as any) || 'General',
         categoryLabel: dto.categoryName || 'General',
         amount: dto.amount,
         currency: dto.currency || 'PEN',
@@ -175,7 +156,7 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
         ) : (
           <div className="divide-y divide-gray-800/60">
             {filtered.map((tx) => {
-              const CategoryIcon = categoryIconMap[tx.category] || Utensils;
+              const { Icon, badgeClass } = getTransactionIconAndStyle(tx.type, tx.categoryLabel, tx.title);
               const isIncome = tx.type === 'income';
 
               return (
@@ -184,8 +165,8 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
                   className="flex items-center justify-between p-4 hover:bg-gray-900/40 transition-colors"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="p-3 rounded-xl bg-gray-900 border border-gray-800 text-gray-300">
-                      <CategoryIcon className="w-5 h-5 text-indigo-400" />
+                    <div className={`p-3 rounded-xl border ${badgeClass}`}>
+                      <Icon className="w-5 h-5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">

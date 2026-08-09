@@ -1,9 +1,9 @@
-'use client';
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Receipt, Split, Sparkles, Wallet, PieChart, Percent, DollarSign } from 'lucide-react';
 import { useWorkspaceStore, DefaultSplitRule } from '@/lib/stores/useWorkspaceStore';
 import { useCreateTransaction } from '@/hooks/useTransactions';
+import { useAccounts, useCreateAccount } from '@/hooks/useAccounts';
+import { useCategories, useCreateCategory } from '@/hooks/useCategories';
 
 interface CreateTransactionModalProps {
   isOpen: boolean;
@@ -19,8 +19,8 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [type, setType] = useState(defaultType);
-  const [category, setCategory] = useState('food');
-  const [accountId, setAccountId] = useState('acc-1');
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
 
   // Split options initialized with default rules
   const [isSplit, setIsSplit] = useState(hasPartner);
@@ -29,7 +29,23 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
   const [fixedPartnerAmount, setFixedPartnerAmount] = useState('');
 
   const { mutateAsync: createTx, isPending } = useCreateTransaction();
+  const { data: accountsData } = useAccounts();
+  const { mutateAsync: createAccount } = useCreateAccount();
+  const { data: categoriesData } = useCategories(type === 'income' ? 'INCOME' : 'EXPENSE');
+  const { mutateAsync: createCategory } = useCreateCategory();
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+
+  useEffect(() => {
+    if (accountsData && accountsData.length > 0 && !selectedAccountId) {
+      setSelectedAccountId(accountsData[0].id);
+    }
+  }, [accountsData, selectedAccountId]);
+
+  useEffect(() => {
+    if (categoriesData && categoriesData.length > 0 && !selectedCategoryId) {
+      setSelectedCategoryId(categoriesData[0].id);
+    }
+  }, [categoriesData, selectedCategoryId]);
 
   if (!isOpen) return null;
 
@@ -38,22 +54,58 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
     if (!amount || parseFloat(amount) <= 0) return;
 
     try {
-      await createTx({
-        workspaceId: activeWorkspaceId || 'default-personal-workspace',
-        accountId,
-        categoryId: category,
-        amount: parseFloat(amount),
-        currency: 'PEN',
-        type: type === 'income' ? 'INCOME' : 'EXPENSE',
-        description: title,
-        transactionDate: new Date().toISOString(),
-      });
+      let targetAccountId = selectedAccountId;
+      let targetCategoryId = selectedCategoryId;
+
+      // Autocrear cuenta si no existe
+      if (!targetAccountId && activeWorkspaceId) {
+        try {
+          const newAcc = await createAccount({
+            workspaceId: activeWorkspaceId,
+            name: 'Cuenta Principal',
+            type: 'BANK',
+            balance: 0,
+            currency: 'PEN',
+          });
+          targetAccountId = newAcc.id;
+        } catch (accErr) {
+          console.error('Error al autocrear cuenta para transacción:', accErr);
+        }
+      }
+
+      // Autocrear categoría si no existe
+      if (!targetCategoryId && activeWorkspaceId) {
+        try {
+          const newCat = await createCategory({
+            workspaceId: activeWorkspaceId,
+            name: title || (type === 'income' ? 'Ingreso General' : 'Gasto General'),
+            type: type === 'income' ? 'INCOME' : 'EXPENSE',
+            categoryNature: 'ESSENTIAL',
+          });
+          targetCategoryId = newCat.id;
+        } catch (catErr) {
+          console.error('Error al autocrear categoría para transacción:', catErr);
+        }
+      }
+
+      if (activeWorkspaceId && targetAccountId) {
+        await createTx({
+          workspaceId: activeWorkspaceId,
+          accountId: targetAccountId,
+          categoryId: targetCategoryId || undefined,
+          amount: parseFloat(amount),
+          currency: 'PEN',
+          type: type === 'income' ? 'INCOME' : 'EXPENSE',
+          description: title || (type === 'income' ? 'Ingreso Registrado' : 'Gasto Registrado'),
+          transactionDate: new Date().toISOString(),
+        });
+      }
+
       setTitle('');
       setAmount('');
       onClose();
     } catch (err) {
       console.error('Error al crear transacción real:', err);
-      // Igualmente cerramos para fallback fluido de UX
       onClose();
     }
   };
@@ -161,14 +213,19 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
             <div>
               <label className="block text-xs font-semibold text-gray-300 mb-1">Cuenta Origen</label>
               <select
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
+                value={selectedAccountId}
+                onChange={(e) => setSelectedAccountId(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500"
               >
-                <option value="acc-1">BCP / Yape Principal (S/ 1,450)</option>
-                <option value="acc-2">BBVA Ahorros (S/ 3,400)</option>
-                <option value="acc-3">Tarjeta Interbank (S/ -680)</option>
-                <option value="acc-4">Efectivo Caja Menor (S/ 250)</option>
+                {accountsData && accountsData.length > 0 ? (
+                  accountsData.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} ({acc.currency || 'PEN'} {acc.balance ?? 0})
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Cuenta Principal (Autocrear)</option>
+                )}
               </select>
             </div>
           </div>
@@ -176,15 +233,19 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
           <div>
             <label className="block text-xs font-semibold text-gray-300 mb-1">Categoría</label>
             <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              value={selectedCategoryId}
+              onChange={(e) => setSelectedCategoryId(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500"
             >
-              <option value="food">Alimentación</option>
-              <option value="utilities">Servicios Públicos</option>
-              <option value="entertainment">Entretenimiento</option>
-              <option value="transport">Transporte</option>
-              <option value="income">Ingreso</option>
+              {categoriesData && categoriesData.length > 0 ? (
+                categoriesData.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))
+              ) : (
+                <option value="">Categoría General (Autocrear)</option>
+              )}
             </select>
           </div>
 

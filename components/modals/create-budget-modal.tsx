@@ -1,9 +1,8 @@
-'use client';
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, PieChart, AlertCircle } from 'lucide-react';
 import { useCreateBudget } from '@/hooks/useBudgets';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+import { useCategories, useCreateCategory } from '@/hooks/useCategories';
 
 interface CreateBudgetModalProps {
   isOpen: boolean;
@@ -14,23 +13,50 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
   const { mutateAsync: createBudget, isPending } = useCreateBudget();
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
 
+  const { data: categoriesData } = useCategories('EXPENSE');
+  const { mutateAsync: createCategory } = useCreateCategory();
+
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('food');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [limit, setLimit] = useState('');
+
+  useEffect(() => {
+    if (categoriesData && categoriesData.length > 0 && !selectedCategoryId) {
+      setSelectedCategoryId(categoriesData[0].id);
+    }
+  }, [categoriesData, selectedCategoryId]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !limit) return;
+    if (!name || !limit || !activeWorkspaceId) return;
 
     try {
+      let targetCategoryId = selectedCategoryId;
+
+      // Si no existe ninguna categoría aún, autocreamos una categoría para evitar el duplicado de categoryId=null
+      if (!targetCategoryId && activeWorkspaceId) {
+        try {
+          const newCat = await createCategory({
+            workspaceId: activeWorkspaceId,
+            name: name,
+            type: 'EXPENSE',
+            categoryNature: 'ESSENTIAL',
+          });
+          targetCategoryId = newCat.id;
+        } catch (catErr) {
+          console.error('Error al autocrear categoría para presupuesto:', catErr);
+        }
+      }
+
       await createBudget({
+        workspaceId: activeWorkspaceId,
         name,
-        categoryId: category,
+        categoryId: targetCategoryId || undefined,
+        amount: parseFloat(limit) || 0,
         limitAmount: parseFloat(limit) || 0,
         currency: 'PEN',
-        workspaceId: activeWorkspaceId || undefined,
       });
       setName('');
       setLimit('');
@@ -78,15 +104,19 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
             <div>
               <label className="block text-xs font-semibold text-gray-300 mb-1">Categoría</label>
               <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                value={selectedCategoryId}
+                onChange={(e) => setSelectedCategoryId(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500"
               >
-                <option value="food">Alimentación</option>
-                <option value="utilities">Servicios Públicos</option>
-                <option value="entertainment">Entretenimiento</option>
-                <option value="transport">Transporte</option>
-                <option value="shopping">Compras</option>
+                {categoriesData && categoriesData.length > 0 ? (
+                  categoriesData.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Categoría General (Autocrear)</option>
+                )}
               </select>
             </div>
 

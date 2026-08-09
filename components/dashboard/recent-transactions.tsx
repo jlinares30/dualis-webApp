@@ -1,109 +1,13 @@
 import React from 'react';
-import { 
-  Utensils, 
-  Zap, 
-  Tv, 
-  Home, 
-  Car, 
-  ShoppingBag, 
-  ArrowDownLeft, 
-  ArrowUpRight, 
-  Users, 
-  User
-} from 'lucide-react';
+import { Users, User } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { WorkspaceType, CategoryType, Transaction } from '@/types/finance';
+import { WorkspaceType, Transaction } from '@/types/finance';
 import { useTransactions } from '@/hooks/useTransactions';
+import { getTransactionIconAndStyle } from '@/lib/transaction-icons';
 
 interface RecentTransactionsProps {
   workspace: WorkspaceType;
 }
-
-const mockTransactions: Transaction[] = [
-  {
-    id: 'tx-1',
-    title: 'Supermercado Metro / Tottus',
-    category: 'food',
-    categoryLabel: 'Alimentación',
-    amount: 185,
-    currency: 'PEN',
-    date: 'Hoy, 10:30 AM',
-    type: 'expense',
-    workspace: 'couple',
-    paidBy: 'Jorge',
-    splitRatio: '50/50',
-  },
-  {
-    id: 'tx-2',
-    title: 'Servicio de Luz Luz del Sur / Enel',
-    category: 'utilities',
-    categoryLabel: 'Servicios',
-    amount: 120,
-    currency: 'PEN',
-    date: 'Ayer',
-    type: 'expense',
-    workspace: 'couple',
-    paidBy: 'Sofía',
-    splitRatio: '50/50',
-  },
-  {
-    id: 'tx-3',
-    title: 'Suscripción Netflix & Spotify',
-    category: 'entertainment',
-    categoryLabel: 'Entretenimiento',
-    amount: 45,
-    currency: 'PEN',
-    date: '22 Jul',
-    type: 'expense',
-    workspace: 'personal',
-  },
-  {
-    id: 'tx-4',
-    title: 'Transferencia Nómina',
-    category: 'income',
-    categoryLabel: 'Ingreso',
-    amount: 3800,
-    currency: 'PEN',
-    date: '15 Jul',
-    type: 'income',
-    workspace: 'personal',
-  },
-  {
-    id: 'tx-5',
-    title: 'Cena Restaurante Chifa / Pardos',
-    category: 'food',
-    categoryLabel: 'Alimentación',
-    amount: 95,
-    currency: 'PEN',
-    date: '14 Jul',
-    type: 'expense',
-    workspace: 'couple',
-    paidBy: 'Jorge',
-    splitRatio: '50/50',
-  },
-];
-
-const categoryIconMap: Record<CategoryType, React.ComponentType<{ className?: string }>> = {
-  food: Utensils,
-  utilities: Zap,
-  entertainment: Tv,
-  housing: Home,
-  transport: Car,
-  shopping: ShoppingBag,
-  health: ShoppingBag,
-  income: ArrowDownLeft,
-};
-
-const categoryColorMap: Record<CategoryType, string> = {
-  food: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-  utilities: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-  entertainment: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  housing: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  transport: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
-  shopping: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
-  health: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  income: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-};
 
 export function RecentTransactions({ workspace }: RecentTransactionsProps) {
   const { data: pageData, isLoading } = useTransactions(0, 5);
@@ -112,7 +16,7 @@ export function RecentTransactions({ workspace }: RecentTransactionsProps) {
     ? pageData.content.map((dto) => ({
         id: dto.id,
         title: dto.description || 'Sin concepto',
-        category: (dto.categoryName?.toLowerCase() as CategoryType) || 'food',
+        category: (dto.categoryName as any) || 'General',
         categoryLabel: dto.categoryName || 'General',
         amount: dto.amount,
         currency: dto.currency || 'PEN',
@@ -148,7 +52,7 @@ export function RecentTransactions({ workspace }: RecentTransactionsProps) {
           </div>
         ) : (
           transactions.map((tx) => {
-            const CategoryIcon = categoryIconMap[tx.category] || Utensils;
+            const { Icon, badgeClass } = getTransactionIconAndStyle(tx.type, tx.categoryLabel, tx.title);
             const isIncome = tx.type === 'income';
 
             return (
@@ -157,8 +61,8 @@ export function RecentTransactions({ workspace }: RecentTransactionsProps) {
                 className="flex items-center justify-between p-3 rounded-xl bg-gray-900/60 border border-gray-800/50 hover:border-gray-700/80 transition-all duration-200"
               >
                 <div className="flex items-center gap-3.5">
-                  <div className={`p-2.5 rounded-xl border ${categoryColorMap[tx.category] || categoryColorMap.food}`}>
-                    <CategoryIcon className="w-5 h-5" />
+                  <div className={`p-2.5 rounded-xl border ${badgeClass}`}>
+                    <Icon className="w-5 h-5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
