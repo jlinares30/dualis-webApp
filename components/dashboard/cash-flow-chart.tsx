@@ -10,9 +10,10 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { TrendingUp, Calendar } from 'lucide-react';
 import { useTransactions } from '@/hooks/useTransactions';
+import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
 interface CashFlowData {
   month: string;
@@ -20,26 +21,21 @@ interface CashFlowData {
   gastos: number;
 }
 
-const mockData: CashFlowData[] = [
-  { month: 'Ene', ingresos: 3500, gastos: 2100 },
-  { month: 'Feb', ingresos: 3600, gastos: 2300 },
-  { month: 'Mar', ingresos: 3800, gastos: 1950 },
-  { month: 'Abr', ingresos: 3700, gastos: 2400 },
-  { month: 'May', ingresos: 4100, gastos: 2200 },
-  { month: 'Jun', ingresos: 3900, gastos: 2150 },
-  { month: 'Jul', ingresos: 4200, gastos: 2050 },
-];
+interface CashFlowChartProps {
+  period?: DateFilterOption;
+}
 
-export function CashFlowChart() {
+export function CashFlowChart({ period }: CashFlowChartProps) {
   const { data: pageData, isLoading } = useTransactions(0, 100);
 
   // Generar meses acumulados dinámicos desde transacciones reales
   const chartData = React.useMemo(() => {
     if (!pageData?.content || pageData.content.length === 0) return [];
     
+    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
     const monthMap: Record<string, { month: string; ingresos: number; gastos: number }> = {};
     
-    pageData.content.forEach((tx) => {
+    filteredTx.forEach((tx) => {
       if (!tx.transactionDate) return;
       const date = new Date(tx.transactionDate);
       const monthKey = date.toLocaleDateString('es-PE', { month: 'short' });

@@ -11,14 +11,19 @@ import {
   CartesianGrid,
   Cell,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { CalendarDays, Flame } from 'lucide-react';
 import { useTransactions } from '@/hooks/useTransactions';
+import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
 const DAYS_OF_WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const DAY_COLORS = ['#f43f5e', '#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'];
 
-export function ExpenseHeatmapChart() {
+interface ExpenseHeatmapChartProps {
+  period?: DateFilterOption;
+}
+
+export function ExpenseHeatmapChart({ period }: ExpenseHeatmapChartProps) {
   const { data: pageData, isLoading } = useTransactions(0, 200);
 
   const { chartData, peakDay, peakAmount } = React.useMemo(() => {
@@ -30,9 +35,10 @@ export function ExpenseHeatmapChart() {
       };
     }
 
+    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
     const dayTotals = [0, 0, 0, 0, 0, 0, 0];
 
-    pageData.content.forEach((tx) => {
+    filteredTx.forEach((tx) => {
       if (tx.type !== 'EXPENSE' || !tx.transactionDate) return;
       const date = new Date(tx.transactionDate);
       const dayIdx = date.getDay(); // 0 = Dom, 6 = Sáb

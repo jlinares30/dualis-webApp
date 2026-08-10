@@ -11,11 +11,16 @@ import {
   CartesianGrid,
   Legend,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { BarChart3, TrendingUp } from 'lucide-react';
 import { useTransactions } from '@/hooks/useTransactions';
+import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
-export function MonthlyTrendBarChart() {
+interface MonthlyTrendBarChartProps {
+  period?: DateFilterOption;
+}
+
+export function MonthlyTrendBarChart({ period }: MonthlyTrendBarChartProps) {
   const { data: pageData, isLoading } = useTransactions(0, 300);
 
   const { chartData } = React.useMemo(() => {
@@ -23,9 +28,10 @@ export function MonthlyTrendBarChart() {
       return { chartData: [] };
     }
 
+    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
     const monthMap: Record<string, { month: string; Ingresos: number; Gastos: number }> = {};
 
-    pageData.content.forEach((tx) => {
+    filteredTx.forEach((tx) => {
       if (!tx.transactionDate) return;
       const date = new Date(tx.transactionDate);
       const monthKey = date.toLocaleDateString('es-PE', { month: 'short' });

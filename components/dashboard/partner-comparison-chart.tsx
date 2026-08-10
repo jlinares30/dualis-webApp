@@ -11,13 +11,18 @@ import {
   CartesianGrid,
   Cell,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { Users, HeartHandshake, ArrowRightLeft } from 'lucide-react';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
+import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
-export function PartnerComparisonChart() {
+interface PartnerComparisonChartProps {
+  period?: DateFilterOption;
+}
+
+export function PartnerComparisonChart({ period }: PartnerComparisonChartProps) {
   const { user } = useAuthStore();
   const { partnerName } = useWorkspaceStore();
   const { data: pageData, isLoading } = useTransactions(0, 200);
@@ -38,10 +43,11 @@ export function PartnerComparisonChart() {
       };
     }
 
+    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
     let mine = 0;
     let partner = 0;
 
-    pageData.content.forEach((tx) => {
+    filteredTx.forEach((tx) => {
       if (tx.type !== 'EXPENSE') return;
 
       // Si la transacción fue realizada por el usuario actual o no especifica otro id

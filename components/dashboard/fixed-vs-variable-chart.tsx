@@ -8,11 +8,16 @@ import {
   Cell,
   Tooltip,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { Layers, ShieldCheck, ShoppingBag } from 'lucide-react';
 import { useTransactions } from '@/hooks/useTransactions';
+import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
-export function FixedVsVariableChart() {
+interface FixedVsVariableChartProps {
+  period?: DateFilterOption;
+}
+
+export function FixedVsVariableChart({ period }: FixedVsVariableChartProps) {
   const { data: pageData, isLoading } = useTransactions(0, 200);
 
   const { fixedAmount, variableAmount, totalExpenses, chartData } = React.useMemo(() => {
@@ -20,12 +25,13 @@ export function FixedVsVariableChart() {
       return { fixedAmount: 0, variableAmount: 0, totalExpenses: 0, chartData: [] };
     }
 
+    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
     let fixed = 0;
     let variable = 0;
 
     const fixedCategories = ['Vivienda', 'Servicios', 'Salud', 'Educación', 'Préstamos', 'Alquiler'];
 
-    pageData.content.forEach((tx) => {
+    filteredTx.forEach((tx) => {
       if (tx.type !== 'EXPENSE') return;
 
       const catName = tx.categoryName || '';

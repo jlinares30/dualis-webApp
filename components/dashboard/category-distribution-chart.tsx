@@ -8,10 +8,11 @@ import {
   Cell,
   Tooltip,
 } from 'recharts';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { PieChart as PieIcon } from 'lucide-react';
 import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
+import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
 const CATEGORY_COLORS = [
   '#6366f1', // Indigo
@@ -33,7 +34,11 @@ interface CategoryPieData {
   percentage: number;
 }
 
-export function CategoryDistributionChart() {
+interface CategoryDistributionChartProps {
+  period?: DateFilterOption;
+}
+
+export function CategoryDistributionChart({ period }: CategoryDistributionChartProps) {
   const { data: pageData, isLoading: isLoadingTx } = useTransactions(0, 200);
   const { data: categories = [], isLoading: isLoadingCat } = useCategories('EXPENSE');
 
@@ -42,10 +47,11 @@ export function CategoryDistributionChart() {
       return { chartData: [], totalExpenses: 0 };
     }
 
+    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
     const catMap: Record<string, { name: string; value: number }> = {};
     let grandTotal = 0;
 
-    pageData.content.forEach((tx) => {
+    filteredTx.forEach((tx) => {
       if (tx.type !== 'EXPENSE') return;
 
       const catName = tx.categoryName || 'Otros Gastos';
