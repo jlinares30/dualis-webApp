@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { 
-  Bell, 
-  ChevronDown, 
-  User, 
-  Users, 
-  Menu, 
+import {
+  Bell,
+  ChevronDown,
+  User,
+  Users,
+  Menu,
   Check,
   ShieldCheck,
   HeartHandshake,
@@ -39,7 +39,7 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
     if (token && !user) {
       getMe()
         .then((userData) => setUser(userData))
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [user, setUser]);
 
@@ -101,9 +101,9 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
 
             {dropdownOpen && (
               <>
-                <div 
-                  className="fixed inset-0 z-40" 
-                  onClick={() => setDropdownOpen(false)} 
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setDropdownOpen(false)}
                 />
                 <div className="absolute left-0 mt-2 w-72 rounded-2xl bg-[#0f172a] border border-gray-800 shadow-2xl p-2 z-50 animate-in fade-in-50 zoom-in-95">
                   <div className="px-3 py-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
@@ -175,9 +175,9 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
 
           {notificationsOpen && (
             <>
-              <div 
-                className="fixed inset-0 z-40" 
-                onClick={() => setNotificationsOpen(false)} 
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setNotificationsOpen(false)}
               />
               <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-[#0f172a] border border-gray-800 shadow-2xl p-3 z-50">
                 <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-800">
@@ -187,7 +187,7 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
                 <div className="space-y-2 text-xs">
                   <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800/80">
                     <p className="text-gray-200 font-medium">Sofía agregó un gasto</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">Supermercado - $120.000 COP (Split 50/50)</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Supermercado - S/.120 PEN (Split 50/50)</p>
                     <span className="text-[9px] text-gray-500 mt-1 block">Hace 15 min</span>
                   </div>
                   <div className="p-2.5 rounded-xl bg-gray-900/80 border border-gray-800/80">
