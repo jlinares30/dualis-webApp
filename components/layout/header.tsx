@@ -30,7 +30,7 @@ interface HeaderProps {
 export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }: HeaderProps) {
   const router = useRouter();
   const { user, isAuthenticated, logoutUser, setUser } = useAuthStore();
-  const { hasPartner, partnerName } = useWorkspaceStore();
+  const { hasPartner, partnerName, workspaces: userWorkspaces, setActiveWorkspace } = useWorkspaceStore();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -68,6 +68,8 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
     router.push('/login');
   };
 
+  const showWorkspaceSwitcher = hasPartner;
+
   return (
     <header className="sticky top-0 z-30 h-16 bg-[#090d16]/90 backdrop-blur-md border-b border-gray-800/80 px-4 md:px-8 flex items-center justify-between">
       {/* Left: Mobile Toggle & Context Switcher */}
@@ -80,8 +82,8 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
           <Menu className="w-5 h-5" />
         </button>
 
-        {/* Context Switcher Dropdown (Only visible if user has linked a partner) */}
-        {hasPartner ? (
+        {/* Context Switcher Dropdown */}
+        {showWorkspaceSwitcher ? (
           <div className="relative">
             <button
               onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -117,6 +119,12 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
                           key={space.id}
                           onClick={() => {
                             onWorkspaceChange(space.id);
+                            const targetWs = userWorkspaces.find((w) =>
+                              space.id === 'couple' ? w.type === 'COUPLE' : w.type === 'INDIVIDUAL'
+                            );
+                            if (targetWs) {
+                              setActiveWorkspace(targetWs.id, space.id);
+                            }
                             setDropdownOpen(false);
                           }}
                           className={cn(

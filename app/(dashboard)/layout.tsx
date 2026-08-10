@@ -22,13 +22,21 @@ export default function DashboardLayout({
   // Inicializar consulta de workspaces del usuario para que el store tenga un UUID de workspace válido
   useWorkspaces();
 
-  const { activeWorkspaceType, setActiveWorkspace, hasPartner } = useWorkspaceStore();
+  const { activeWorkspaceType, activeWorkspaceId, switchWorkspaceType, hasPartner, workspaces } = useWorkspaceStore();
   const { isAuthenticated, token } = useAuthStore();
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  useEffect(() => {
+    if (!hasPartner && workspaces.length > 0) {
+      const personalWs = workspaces.find((w) => w.type === 'INDIVIDUAL' || (w.type as any) === 'personal');
+      if (personalWs && activeWorkspaceId !== personalWs.id) {
+        switchWorkspaceType('personal');
+      }
+    }
+  }, [hasPartner, workspaces, activeWorkspaceId, switchWorkspaceType]);
 
   useEffect(() => {
     if (isMounted) {
@@ -39,7 +47,7 @@ export default function DashboardLayout({
     }
   }, [isMounted, isAuthenticated, token, router]);
 
-  const currentWorkspace: WorkspaceType = hasPartner ? activeWorkspaceType : 'personal';
+  const currentWorkspace: WorkspaceType = activeWorkspaceType === 'COUPLE' || activeWorkspaceType === 'couple' ? 'couple' : 'personal';
 
   // Mostrar un loader mientras se verifica el estado de sesión
   if (!isMounted || (!isAuthenticated && !token && (typeof window !== 'undefined' && !localStorage.getItem('dualis_auth_token')))) {
@@ -53,7 +61,6 @@ export default function DashboardLayout({
     );
   }
 
-
   return (
     <div className="min-h-screen flex bg-[#090d16] text-gray-100 antialiased">
       {/* Sidebar */}
@@ -64,7 +71,7 @@ export default function DashboardLayout({
         {/* Header with Context Switcher */}
         <Header
           currentWorkspace={currentWorkspace}
-          onWorkspaceChange={(type) => setActiveWorkspace(type, type)}
+          onWorkspaceChange={(type) => switchWorkspaceType(type)}
           onOpenMobileMenu={() => setMobileOpen(true)}
         />
 

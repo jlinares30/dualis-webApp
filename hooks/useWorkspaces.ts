@@ -44,6 +44,19 @@ export function useWorkspaces() {
   });
 }
 
+export function useCreateWorkspace() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { name: string; description?: string; type: 'INDIVIDUAL' | 'COUPLE'; currency?: string; ownerEmail: string }) =>
+      createWorkspace(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+}
+
 export function useUpdateWorkspace() {
   const queryClient = useQueryClient();
 
@@ -60,14 +73,18 @@ export function useInviteCode() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const activeWorkspaceType = useWorkspaceStore((state) => state.activeWorkspaceType);
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const typeStr = (activeWs?.type || activeWorkspaceType || '').toString().toUpperCase();
 
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
-  const isCoupleWorkspace = activeWorkspaceType === 'COUPLE' || activeWorkspaceType === 'couple';
+  const isCoupleWorkspace = typeStr === 'COUPLE';
 
   return useQuery({
     queryKey: ['inviteCode', activeWorkspaceId],
     queryFn: () => getInviteCode(activeWorkspaceId!),
-    enabled: isAuthenticated && Boolean(isValidUuid) && isCoupleWorkspace,
+    enabled: isAuthenticated && Boolean(isValidUuid) && Boolean(isCoupleWorkspace),
   });
 }
 
@@ -86,12 +103,13 @@ export function useJoinWorkspace() {
 
 export function useUnlinkPartner() {
   const queryClient = useQueryClient();
+  const unlinkPartner = useWorkspaceStore((state) => state.unlinkPartner);
 
   return useMutation({
     mutationFn: (workspaceId: string) => unlinkPartnerWorkspace(workspaceId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+      unlinkPartner();
+      queryClient.invalidateQueries();
     },
   });
 }

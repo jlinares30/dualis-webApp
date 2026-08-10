@@ -52,12 +52,16 @@ export async function getInviteCode(workspaceId?: string): Promise<InviteCodeRes
   if (!workspaceId) {
     return { code: '' };
   }
-  const response = await apiFetch<any>(`/workspaces/${workspaceId}/invite`, {
-    method: 'POST',
-  });
-  return {
-    code: response.invitationCode || response.code || '',
-  };
+  try {
+    const response = await apiFetch<any>(`/workspaces/${workspaceId}/invite`, {
+      method: 'POST',
+    });
+    return {
+      code: response.invitationCode || response.code || '',
+    };
+  } catch {
+    return { code: '' };
+  }
 }
 
 export async function joinWorkspaceByCode(code: string, partnerEmail: string): Promise<WorkspaceDTO> {
