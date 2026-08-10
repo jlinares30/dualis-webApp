@@ -14,6 +14,8 @@ import {
   Users,
   Settings,
   Sparkles,
+  Target,
+  Calendar,
   X,
   Menu
 } from 'lucide-react';
@@ -31,6 +33,8 @@ export const navigationItems: NavItem[] = [
   { name: 'Cuentas', href: '/accounts', icon: Wallet },
   { name: 'Transacciones', href: '/transactions', icon: Receipt },
   { name: 'Presupuestos', href: '/budgets', icon: PieChart },
+  { name: 'Metas de Ahorro', href: '/goals', icon: Target },
+  { name: 'Pagos Fijos', href: '/subscriptions', icon: Calendar },
   { name: 'Inversiones', href: '/investments', icon: TrendingUp },
   { name: 'Liquidación', href: '/settlements', icon: HeartHandshake },
   { name: 'Espacios', href: '/workspaces', icon: Users },

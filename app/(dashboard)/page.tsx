@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { SummaryCards } from '@/components/dashboard/summary-cards';
 import { QuickActions } from '@/components/dashboard/quick-actions';
 import { RecentTransactions } from '@/components/dashboard/recent-transactions';
@@ -13,6 +13,9 @@ import { NetWorthTrendChart } from '@/components/dashboard/net-worth-trend-chart
 import { ExpenseHeatmapChart } from '@/components/dashboard/expense-heatmap-chart';
 import { MonthlyTrendBarChart } from '@/components/dashboard/monthly-trend-bar-chart';
 import { FixedVsVariableChart } from '@/components/dashboard/fixed-vs-variable-chart';
+import { GoalsWidget } from '@/components/dashboard/goals-widget';
+import { UpcomingBillsWidget } from '@/components/dashboard/upcoming-bills-widget';
+import { DashboardDateFilter, DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 import { WorkspaceType } from '@/types/finance';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { Sparkles } from 'lucide-react';
@@ -24,6 +27,7 @@ interface DashboardPageProps {
 export default function DashboardPage({ workspace = 'personal' }: DashboardPageProps) {
   const { hasPartner, partnerName } = useWorkspaceStore();
   const isCouple = hasPartner && workspace === 'couple';
+  const [selectedPeriod, setSelectedPeriod] = useState<DateFilterOption>('THIS_MONTH');
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -45,43 +49,45 @@ export default function DashboardPage({ workspace = 'personal' }: DashboardPageP
           </p>
         </div>
 
-        {/* Quick Actions Component */}
-        <QuickActions />
+        <div className="flex items-center gap-3">
+          <DashboardDateFilter selectedPeriod={selectedPeriod} onPeriodChange={setSelectedPeriod} />
+          <QuickActions />
+        </div>
       </div>
 
       {/* Financial Summary Metric Cards */}
-      <SummaryCards workspace={workspace} />
+      <SummaryCards workspace={workspace} period={selectedPeriod} />
 
       {/* Main Cash Flow Chart */}
-      <CashFlowChart />
+      <CashFlowChart period={selectedPeriod} />
 
       {/* Two Column Grid: Category Distribution & Savings Rate Gauge */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CategoryDistributionChart />
-        <SavingsRateGauge />
+        <CategoryDistributionChart period={selectedPeriod} />
+        <SavingsRateGauge period={selectedPeriod} />
       </div>
 
       {/* Historical Monthly Trend & Heatmap Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <MonthlyTrendBarChart />
-        <ExpenseHeatmapChart />
+        <MonthlyTrendBarChart period={selectedPeriod} />
+        <ExpenseHeatmapChart period={selectedPeriod} />
+      </div>
+
+      {/* Three Column Row: Goals Widget, Upcoming Bills & Budget Widget */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <GoalsWidget />
+        <UpcomingBillsWidget />
+        <BudgetWidget />
       </div>
 
       {/* Secondary Analytics Row: Fixed vs Variable & Net Worth / Partner Comparison */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1">
-          <FixedVsVariableChart />
-        </div>
-        <div className="lg:col-span-1">
-          {isCouple ? (
-            <PartnerComparisonChart />
-          ) : (
-            <NetWorthTrendChart />
-          )}
-        </div>
-        <div className="lg:col-span-1">
-          <BudgetWidget />
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <FixedVsVariableChart period={selectedPeriod} />
+        {isCouple ? (
+          <PartnerComparisonChart period={selectedPeriod} />
+        ) : (
+          <NetWorthTrendChart />
+        )}
       </div>
 
       {/* Recent Transactions List */}

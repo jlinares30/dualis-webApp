@@ -5,12 +5,16 @@ import { WorkspaceType, Transaction } from '@/types/finance';
 import { useTransactions } from '@/hooks/useTransactions';
 import { getTransactionIconAndStyle } from '@/lib/transaction-icons';
 
+import { ExportButton } from '@/components/ui/export-button';
+
 interface RecentTransactionsProps {
   workspace: WorkspaceType;
 }
 
 export function RecentTransactions({ workspace }: RecentTransactionsProps) {
   const { data: pageData, isLoading } = useTransactions(0, 5);
+
+  const transactionsList = pageData?.content || [];
 
   const transactions: Transaction[] = pageData?.content
     ? pageData.content.map((dto) => ({
@@ -34,9 +38,7 @@ export function RecentTransactions({ workspace }: RecentTransactionsProps) {
           <h3 className="font-bold text-base text-white">Últimos Movimientos</h3>
           <p className="text-xs text-gray-400">Historial reciente de gastos e ingresos</p>
         </div>
-        <button className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer">
-          Ver todo
-        </button>
+        <ExportButton transactions={transactionsList} />
       </div>
 
       <div className="space-y-3">

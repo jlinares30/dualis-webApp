@@ -2,25 +2,56 @@
 
 import React from 'react';
 import { Wallet, TrendingDown, Users, ArrowUpRight } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { WorkspaceType } from '@/types/finance';
 import { useDashboardSummary } from '@/hooks/useFinanceQuery';
+import { useTransactions } from '@/hooks/useTransactions';
+import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
 interface SummaryCardsProps {
   workspace: WorkspaceType;
+  period?: DateFilterOption;
 }
 
-export function SummaryCards({ workspace }: SummaryCardsProps) {
+export function SummaryCards({ workspace, period }: SummaryCardsProps) {
   const isCouple = workspace === 'couple';
-  const { data, isLoading } = useDashboardSummary();
+  const { data: summaryData, isLoading: isLoadingSummary } = useDashboardSummary();
+  const { data: txPage, isLoading: isLoadingTx } = useTransactions(0, 200);
 
-  const savingsRate = data?.savingsRatePercentage ?? data?.savingsRate ?? 0;
-  const totalBalance = data?.totalBalance ?? data?.totalLiquidity ?? 0;
-  const netSavings = data?.netSavings ?? 0;
-  const monthlyExpenses = data?.monthlyExpenses ?? 0;
-  const monthlyIncome = data?.monthlyIncome ?? 0;
-  const exceededCount = data?.exceededBudgetsCount ?? 0;
-  const currency = data?.currency || 'PEN';
+  const { monthlyIncome, monthlyExpenses, netSavings, savingsRate } = React.useMemo(() => {
+    if (!txPage?.content || txPage.content.length === 0) {
+      return {
+        monthlyIncome: summaryData?.monthlyIncome || 0,
+        monthlyExpenses: summaryData?.monthlyExpenses || 0,
+        netSavings: summaryData?.netSavings || 0,
+        savingsRate: summaryData?.savingsRatePercentage || 0,
+      };
+    }
+
+    const filtered = filterTransactionsByPeriod(txPage.content, period);
+    let inc = 0;
+    let exp = 0;
+
+    filtered.forEach((tx) => {
+      if (tx.type === 'INCOME') inc += tx.amount;
+      if (tx.type === 'EXPENSE') exp += tx.amount;
+    });
+
+    const net = inc - exp;
+    const rate = inc > 0 ? (net / inc) * 100 : 0;
+
+    return {
+      monthlyIncome: inc,
+      monthlyExpenses: exp,
+      netSavings: net,
+      savingsRate: rate,
+    };
+  }, [txPage, summaryData, period]);
+
+  const totalBalance = summaryData?.totalBalance ?? summaryData?.totalLiquidity ?? 0;
+  const exceededCount = summaryData?.exceededBudgetsCount ?? 0;
+  const currency = summaryData?.currency || 'PEN';
+  const isLoading = isLoadingSummary || isLoadingTx;
 
   const metrics = [
     {
@@ -32,10 +63,10 @@ export function SummaryCards({ workspace }: SummaryCardsProps) {
       gradient: 'from-emerald-500/10 via-emerald-500/5 to-transparent',
       borderColor: 'border-emerald-500/20',
       iconBg: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-      subtext: data ? `Ahorro neto: ${formatCurrency(netSavings, currency)}` : 'Sin cuentas registradas',
+      subtext: `Ahorro neto: ${formatCurrency(netSavings, currency)}`,
     },
     {
-      title: 'Gastos del Mes',
+      title: 'Gastos del Periodo',
       amount: monthlyExpenses,
       change: `Ingresos: ${formatCurrency(monthlyIncome, currency)}`,
       isPositive: true,
@@ -43,10 +74,10 @@ export function SummaryCards({ workspace }: SummaryCardsProps) {
       gradient: 'from-rose-500/10 via-rose-500/5 to-transparent',
       borderColor: 'border-rose-500/20',
       iconBg: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-      subtext: data ? `${exceededCount} presupuestos excedidos` : 'Sin gastos registrados este mes',
+      subtext: `${exceededCount} presupuestos excedidos`,
     },
     {
-      title: 'Ingresos del Mes',
+      title: 'Ingresos del Periodo',
       amount: monthlyIncome,
       change: '0%',
       isPositive: true,
@@ -54,7 +85,7 @@ export function SummaryCards({ workspace }: SummaryCardsProps) {
       gradient: 'from-indigo-500/10 via-indigo-500/5 to-transparent',
       borderColor: 'border-indigo-500/20',
       iconBg: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-      subtext: 'Acumulado mensual de ingresos',
+      subtext: 'Acumulado de ingresos en el periodo seleccionado',
     },
   ];
 
@@ -82,7 +113,7 @@ export function SummaryCards({ workspace }: SummaryCardsProps) {
                 {isLoading ? (
                   <span className="inline-block w-24 h-7 bg-gray-800 animate-pulse rounded-lg" />
                 ) : (
-                  formatCurrency(item.amount, data?.currency || 'PEN')
+                  formatCurrency(item.amount, summaryData?.currency || 'PEN')
                 )}
               </h3>
               <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">

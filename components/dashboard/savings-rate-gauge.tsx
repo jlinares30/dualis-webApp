@@ -1,20 +1,45 @@
 'use client';
 
 import React from 'react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { ShieldCheck, ShieldAlert, Sparkles, ArrowUpRight, PiggyBank } from 'lucide-react';
 import { useDashboardSummary } from '@/hooks/useDashboard';
+import { useTransactions } from '@/hooks/useTransactions';
+import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
-export function SavingsRateGauge() {
-  const { data: summary, isLoading } = useDashboardSummary();
+interface SavingsRateGaugeProps {
+  period?: DateFilterOption;
+}
 
-  const totalIncome = summary?.monthlyIncome || 0;
-  const totalExpenses = summary?.monthlyExpenses || 0;
-  const netSavings = summary?.netSavings !== undefined ? summary.netSavings : (totalIncome - totalExpenses);
+export function SavingsRateGauge({ period }: SavingsRateGaugeProps) {
+  const { data: summary, isLoading: isLoadingSummary } = useDashboardSummary();
+  const { data: txPage, isLoading: isLoadingTx } = useTransactions(0, 200);
 
-  const savingsRate = summary?.savingsRatePercentage !== undefined
-    ? Math.round(summary.savingsRatePercentage)
-    : (totalIncome > 0 ? Math.round((netSavings / totalIncome) * 100) : 0);
+  const { totalIncome, totalExpenses, netSavings, savingsRate } = React.useMemo(() => {
+    if (!txPage?.content || txPage.content.length === 0) {
+      const inc = summary?.monthlyIncome || 0;
+      const exp = summary?.monthlyExpenses || 0;
+      const net = summary?.netSavings !== undefined ? summary.netSavings : inc - exp;
+      const rate = summary?.savingsRatePercentage !== undefined ? Math.round(summary.savingsRatePercentage) : (inc > 0 ? Math.round((net / inc) * 100) : 0);
+      return { totalIncome: inc, totalExpenses: exp, netSavings: net, savingsRate: rate };
+    }
+
+    const filtered = filterTransactionsByPeriod(txPage.content, period);
+    let inc = 0;
+    let exp = 0;
+
+    filtered.forEach((tx) => {
+      if (tx.type === 'INCOME') inc += tx.amount;
+      if (tx.type === 'EXPENSE') exp += tx.amount;
+    });
+
+    const net = inc - exp;
+    const rate = inc > 0 ? Math.round((net / inc) * 100) : 0;
+
+    return { totalIncome: inc, totalExpenses: exp, netSavings: net, savingsRate: rate };
+  }, [txPage, summary, period]);
+
+  const isLoading = isLoadingSummary || isLoadingTx;
   const boundedRate = Math.max(0, Math.min(100, savingsRate));
 
   let healthBadge = {
