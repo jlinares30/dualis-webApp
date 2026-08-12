@@ -5,3 +5,6 @@ export * from './useAccounts';
 export * from './useBudgets';
 export * from './useInvestments';
 export * from './useUserProfile';
+export * from './useSplitRules';
+export * from './useSettlements';
+
