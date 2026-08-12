@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   getUserWorkspaces, 
+  getWorkspaceById,
   createWorkspace,
   updateWorkspace,
   UpdateWorkspacePayload,
@@ -44,6 +45,17 @@ export function useWorkspaces() {
   });
 }
 
+export function useWorkspaceDetails(workspaceId?: string | null) {
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isValidUuid = workspaceId && /^[0-9a-fA-F-]{36}$/.test(workspaceId);
+
+  return useQuery({
+    queryKey: ['workspaceDetails', workspaceId],
+    queryFn: () => getWorkspaceById(workspaceId!),
+    enabled: isAuthenticated && Boolean(isValidUuid),
+  });
+}
+
 export function useCreateWorkspace() {
   const queryClient = useQueryClient();
 
@@ -72,19 +84,17 @@ export function useUpdateWorkspace() {
 export function useInviteCode() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
-  const activeWorkspaceType = useWorkspaceStore((state) => state.activeWorkspaceType);
   const workspaces = useWorkspaceStore((state) => state.workspaces);
 
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
-  const typeStr = (activeWs?.type || activeWorkspaceType || '').toString().toUpperCase();
-
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
-  const isCoupleWorkspace = typeStr === 'COUPLE';
+  const isCoupleWorkspace = activeWs?.type === 'COUPLE';
 
   return useQuery({
     queryKey: ['inviteCode', activeWorkspaceId],
     queryFn: () => getInviteCode(activeWorkspaceId!),
     enabled: isAuthenticated && Boolean(isValidUuid) && Boolean(isCoupleWorkspace),
+    retry: false,
   });
 }
 
@@ -96,6 +106,8 @@ export function useJoinWorkspace() {
       joinWorkspaceByCode(code, partnerEmail),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      queryClient.invalidateQueries({ queryKey: ['workspaceDetails'] });
+      queryClient.invalidateQueries({ queryKey: ['debtBalanceSummary'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
     },
   });
