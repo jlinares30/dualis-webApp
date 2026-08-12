@@ -1,12 +1,16 @@
 import React from 'react';
-import { PieChart, AlertTriangle, CheckCircle2, AlertCircle } from 'lucide-react';
+import { PiggyBank, AlertTriangle, CheckCircle2, AlertCircle, ArrowRight, PieChart } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
 import { useBudgets } from '@/hooks/useBudgets';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+import Link from 'next/link';
 
 export function BudgetWidget() {
-  const { data: budgetsData, isLoading } = useBudgets();
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
+  const { data: budgets = [], isLoading } = useBudgets();
 
-  const budgets = budgetsData || [];
   const totalSpent = budgets.reduce((acc, b) => acc + (b.spentAmount || 0), 0);
   const totalLimit = budgets.reduce((acc, b) => acc + (b.limitAmount || 0), 0);
   const overallPercentage = totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0;
@@ -77,8 +81,8 @@ export function BudgetWidget() {
             <div className="flex justify-between items-baseline text-xs">
               <span className="text-gray-400">Gasto Total Acumulado</span>
               <span className="font-bold text-white">
-                {formatCurrency(totalSpent, budgets[0]?.currency || 'PEN')}{' '}
-                <span className="text-gray-400 font-normal">/ {formatCurrency(totalLimit, budgets[0]?.currency || 'PEN')}</span>
+                {formatCurrency(totalSpent, currency)}{' '}
+                <span className="text-gray-400 font-normal">/ {formatCurrency(totalLimit, currency)}</span>
               </span>
             </div>
             <div className="w-full h-3 rounded-full bg-gray-800 overflow-hidden p-0.5">
@@ -102,7 +106,7 @@ export function BudgetWidget() {
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-medium text-gray-200">{item.name}</span>
                     <span className="text-gray-400">
-                      <span className="font-semibold text-gray-100">{formatCurrency(spent, item.currency || 'PEN')}</span> ({pct}%)
+                      <span className="font-semibold text-gray-100">{formatCurrency(spent, item.currency || currency)}</span> ({pct}%)
                     </span>
                   </div>
                   <div className="w-full h-2 rounded-full bg-gray-800 overflow-hidden">

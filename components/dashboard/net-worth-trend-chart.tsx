@@ -15,8 +15,12 @@ import { formatCurrency } from '@/lib/utils';
 import { Landmark, TrendingUp, Wallet, Shield } from 'lucide-react';
 import { useAccounts } from '@/hooks/useAccounts';
 import { useInvestments } from '@/hooks/useInvestments';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function NetWorthTrendChart() {
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
   const { data: accounts = [], isLoading: isLoadingAcc } = useAccounts();
   const { data: investments = [], isLoading: isLoadingInv } = useInvestments();
 
@@ -71,7 +75,7 @@ export function NetWorthTrendChart() {
         <div className="text-right">
           <span className="text-xs font-semibold text-gray-400 block">Patrimonio Neto Total</span>
           <span className="text-base font-extrabold text-white">
-            {formatCurrency(totalNetWorth, 'PEN')}
+            {formatCurrency(totalNetWorth, currency)}
           </span>
         </div>
       </div>
@@ -89,7 +93,7 @@ export function NetWorthTrendChart() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} layout="vertical" margin={{ top: 0, right: 10, left: 10, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" horizontal={false} />
-                  <XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `S/ ${val}`} />
+                  <XAxis type="number" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}`} />
                   <YAxis type="category" dataKey="category" hide />
                   <Tooltip
                     cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
@@ -99,11 +103,11 @@ export function NetWorthTrendChart() {
                           <div className="rounded-xl bg-[#090d16] border border-gray-800 p-3 shadow-2xl space-y-1 text-xs">
                             <p className="text-blue-400 font-semibold flex justify-between gap-4">
                               <span>Liquidez Bancaria:</span>
-                              <span>{formatCurrency((payload[0]?.value as number) || 0, 'PEN')}</span>
+                              <span>{formatCurrency((payload[0]?.value as number) || 0, currency)}</span>
                             </p>
                             <p className="text-purple-400 font-semibold flex justify-between gap-4">
                               <span>Inversiones / Activos:</span>
-                              <span>{formatCurrency((payload[1]?.value as number) || 0, 'PEN')}</span>
+                              <span>{formatCurrency((payload[1]?.value as number) || 0, currency)}</span>
                             </p>
                           </div>
                         );
@@ -124,7 +128,7 @@ export function NetWorthTrendChart() {
                   <Wallet className="w-3.5 h-3.5 text-blue-400" />
                   <span className="font-semibold">Cuentas Líquidas</span>
                 </div>
-                <span className="font-bold text-white">{formatCurrency(liquidAssets, 'PEN')}</span>
+                <span className="font-bold text-white">{formatCurrency(liquidAssets, currency)}</span>
               </div>
 
               <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 flex items-center justify-between">
@@ -132,7 +136,7 @@ export function NetWorthTrendChart() {
                   <TrendingUp className="w-3.5 h-3.5 text-purple-400" />
                   <span className="font-semibold">Inversiones</span>
                 </div>
-                <span className="font-bold text-white">{formatCurrency(investmentAssets, 'PEN')}</span>
+                <span className="font-bold text-white">{formatCurrency(investmentAssets, currency)}</span>
               </div>
             </div>
           </>

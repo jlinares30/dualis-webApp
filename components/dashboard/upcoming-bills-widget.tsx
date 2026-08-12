@@ -5,8 +5,12 @@ import Link from 'next/link';
 import { Calendar, ChevronRight, CheckCircle2, Clock, Plus, Zap, Tv, Home, Shield, BookOpen, Layers } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useSubscriptions, useToggleSubscriptionPaid } from '@/hooks/useSubscriptions';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function UpcomingBillsWidget() {
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
   const { data: subs = [], isLoading } = useSubscriptions();
   const { mutateAsync: togglePaidMut } = useToggleSubscriptionPaid();
 
@@ -97,7 +101,7 @@ export function UpcomingBillsWidget() {
                 </div>
 
                 <div className="text-right">
-                  <span className="font-bold text-white">{formatCurrency(sub.amount, sub.currency || 'PEN')}</span>
+                  <span className="font-bold text-white">{formatCurrency(sub.amount, sub.currency || currency)}</span>
                 </div>
               </div>
             );

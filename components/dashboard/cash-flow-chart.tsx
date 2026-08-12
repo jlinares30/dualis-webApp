@@ -15,6 +15,8 @@ import { TrendingUp, Calendar } from 'lucide-react';
 import { useTransactions } from '@/hooks/useTransactions';
 import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+
 interface CashFlowData {
   month: string;
   ingresos: number;
@@ -26,7 +28,10 @@ interface CashFlowChartProps {
 }
 
 export function CashFlowChart({ period }: CashFlowChartProps) {
-  const { data: pageData, isLoading } = useTransactions(0, 100);
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
+  const { data: pageData, isLoading } = useTransactions(0, 300);
 
   // Generar meses acumulados dinámicos desde transacciones reales
   const chartData = React.useMemo(() => {
@@ -139,11 +144,11 @@ export function CashFlowChart({ period }: CashFlowChartProps) {
                         </p>
                         <p className="text-emerald-400 font-semibold flex justify-between gap-4">
                           <span>Ingresos:</span>
-                          <span>{formatCurrency((payload[0]?.value as number) || 0, 'PEN')}</span>
+                          <span>{formatCurrency((payload[0]?.value as number) || 0, currency)}</span>
                         </p>
                         <p className="text-rose-400 font-semibold flex justify-between gap-4">
                           <span>Gastos:</span>
-                          <span>{formatCurrency((payload[1]?.value as number) || 0, 'PEN')}</span>
+                          <span>{formatCurrency((payload[1]?.value as number) || 0, currency)}</span>
                         </p>
                       </div>
                     );

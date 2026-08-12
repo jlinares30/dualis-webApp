@@ -19,6 +19,7 @@ interface WorkspaceState {
   linkPartner: (name: string, email: string, defaultRule?: DefaultSplitRule) => void;
   unlinkPartner: () => void;
   setDefaultSplitRule: (rule: DefaultSplitRule, percentage?: number) => void;
+  updateWorkspaceCurrency: (workspaceId: string, currency: string) => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -69,6 +70,12 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             activeWorkspaceType: activeExists ? state.activeWorkspaceType : 'personal',
           };
         }),
+      updateWorkspaceCurrency: (workspaceId: string, currency: string) =>
+        set((state: WorkspaceState) => ({
+          workspaces: state.workspaces.map((w) =>
+            w.id === workspaceId ? { ...w, currency } : w
+          ),
+        })),
       linkPartner: (name: string, email: string, defaultRule: DefaultSplitRule = 'PROPORTIONAL_INCOME') =>
         set((state: WorkspaceState) => {
           const coupleWs = state.workspaces.find((w) => w.type === 'COUPLE' || (w.type as any) === 'couple');

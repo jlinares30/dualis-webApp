@@ -15,8 +15,12 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { useInvestments } from '@/hooks/useInvestments';
 import { CreateInvestmentModal } from '@/components/modals/create-investment-modal';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export default function InvestmentsPage() {
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
   const { data: apiInvestments, isLoading } = useInvestments();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -61,14 +65,14 @@ export default function InvestmentsPage() {
               Valor Total del Portafolio
             </span>
             <h2 className="text-3xl md:text-4xl font-extrabold text-white mt-1">
-              {formatCurrency(totalValue, 'PEN')}
+              {formatCurrency(totalValue, currency)}
             </h2>
             <div className="flex items-center gap-3 mt-2 text-xs font-medium">
               <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border ${totalReturns >= 0 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20'}`}>
                 <ArrowUpRight className="w-3.5 h-3.5" />
-                {totalReturns >= 0 ? '+' : ''}{formatCurrency(totalReturns, 'PEN')} ({overallRoi.toFixed(2)}% ROI)
+                {totalReturns >= 0 ? '+' : ''}{formatCurrency(totalReturns, currency)} ({overallRoi.toFixed(2)}% ROI)
               </span>
-              <span className="text-gray-400">Capital aportado: {formatCurrency(totalCapital, 'PEN')}</span>
+              <span className="text-gray-400">Capital aportado: {formatCurrency(totalCapital, currency)}</span>
             </div>
           </div>
 
@@ -146,11 +150,11 @@ export default function InvestmentsPage() {
                   <div className="flex justify-between items-baseline text-xs">
                     <span className="text-gray-400">Valor Actual</span>
                     <span className="font-bold text-base text-white">
-                      {formatCurrency(current, inv.currency || 'PEN')}
+                      {formatCurrency(current, inv.currency || currency)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-gray-500">Capital: {formatCurrency(capital, inv.currency || 'PEN')}</span>
+                    <span className="text-gray-500">Capital: {formatCurrency(capital, inv.currency || currency)}</span>
                     <span className={`font-semibold ${gain >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                       {gain >= 0 ? '+' : ''}{gain.toFixed(2)} ({roi.toFixed(1)}%)
                     </span>

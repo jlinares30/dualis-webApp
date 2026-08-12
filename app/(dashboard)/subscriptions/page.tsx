@@ -7,7 +7,10 @@ import { useSubscriptions, useCreateSubscription, useToggleSubscriptionPaid, use
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export default function SubscriptionsPage() {
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
+
   const { data: subs = [], isLoading } = useSubscriptions();
   const { mutateAsync: createSubMut, isPending: isCreating } = useCreateSubscription();
   const { mutateAsync: togglePaidMut } = useToggleSubscriptionPaid();
@@ -30,7 +33,7 @@ export default function SubscriptionsPage() {
         amount: parseFloat(amount),
         dueDay: parseInt(dueDay, 10),
         category,
-        currency: 'PEN',
+        currency,
       });
       setModalOpen(false);
       setName('');
@@ -77,7 +80,7 @@ export default function SubscriptionsPage() {
           <div className="p-3 rounded-2xl bg-gray-900 border border-gray-800 text-right">
             <span className="text-[10px] text-gray-400 font-medium block uppercase tracking-wider">Total Fijo Mensual</span>
             <span className="text-base font-extrabold text-amber-400">
-              {formatCurrency(totalMonthlyCommitments, 'PEN')}
+              {formatCurrency(totalMonthlyCommitments, currency)}
             </span>
           </div>
 
@@ -148,7 +151,7 @@ export default function SubscriptionsPage() {
                   <div className="p-3 rounded-2xl bg-gray-900/60 border border-gray-800/60 flex items-center justify-between">
                     <span className="text-xs text-gray-400">Monto Mensual</span>
                     <span className="text-lg font-extrabold text-white">
-                      {formatCurrency(sub.amount, sub.currency || 'PEN')}
+                      {formatCurrency(sub.amount, sub.currency || currency)}
                     </span>
                   </div>
                 </div>

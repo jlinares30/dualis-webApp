@@ -5,8 +5,12 @@ import Link from 'next/link';
 import { Target, Plus, ChevronRight, Award, Plane, Home, Car, Laptop, ShieldCheck } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useGoals } from '@/hooks/useGoals';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function GoalsWidget() {
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
   const { data: goals = [], isLoading } = useGoals();
 
   const getCategoryIcon = (cat?: string) => {
@@ -83,8 +87,8 @@ export function GoalsWidget() {
                 </div>
 
                 <div className="flex justify-between text-[10px] text-gray-400 font-medium">
-                  <span>{formatCurrency(goal.currentAmount, goal.currency || 'PEN')}</span>
-                  <span>Meta: {formatCurrency(goal.targetAmount, goal.currency || 'PEN')}</span>
+                  <span>{formatCurrency(goal.currentAmount, goal.currency || currency)}</span>
+                  <span>Meta: {formatCurrency(goal.targetAmount, goal.currency || currency)}</span>
                 </div>
               </div>
             );

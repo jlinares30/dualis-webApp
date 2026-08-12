@@ -16,11 +16,16 @@ import { BarChart3, TrendingUp } from 'lucide-react';
 import { useTransactions } from '@/hooks/useTransactions';
 import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+
 interface MonthlyTrendBarChartProps {
   period?: DateFilterOption;
 }
 
 export function MonthlyTrendBarChart({ period }: MonthlyTrendBarChartProps) {
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
   const { data: pageData, isLoading } = useTransactions(0, 300);
 
   const { chartData } = React.useMemo(() => {
@@ -97,7 +102,7 @@ export function MonthlyTrendBarChart({ period }: MonthlyTrendBarChartProps) {
               <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                 <XAxis dataKey="month" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `S/ ${val}`} />
+                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}`} />
                 <Tooltip
                   cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                   content={({ active, payload, label }) => {
@@ -107,11 +112,11 @@ export function MonthlyTrendBarChart({ period }: MonthlyTrendBarChartProps) {
                           <p className="font-bold text-gray-200 border-b border-gray-800 pb-1">{label}</p>
                           <p className="text-emerald-400 font-semibold flex justify-between gap-4">
                             <span>Ingresos:</span>
-                            <span>{formatCurrency((payload[0]?.value as number) || 0, 'PEN')}</span>
+                            <span>{formatCurrency((payload[0]?.value as number) || 0, currency)}</span>
                           </p>
                           <p className="text-rose-400 font-semibold flex justify-between gap-4">
                             <span>Gastos:</span>
-                            <span>{formatCurrency((payload[1]?.value as number) || 0, 'PEN')}</span>
+                            <span>{formatCurrency((payload[1]?.value as number) || 0, currency)}</span>
                           </p>
                         </div>
                       );

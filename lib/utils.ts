@@ -5,15 +5,21 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number, currency: string = 'PEN'): string {
-  const formatted = new Intl.NumberFormat('es-PE', {
-    style: 'currency',
-    currency: currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
+export function formatCurrency(amount: number, currency?: string): string {
+  const curr = currency && currency.trim() !== '' ? currency.trim().toUpperCase() : 'PEN';
+  try {
+    const formatted = new Intl.NumberFormat('es-PE', {
+      style: 'currency',
+      currency: curr,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
 
-  // Replace non-breaking spaces with standard space to avoid hydration mismatch between Node and Browser
-  return formatted.replace(/\u00a0/g, ' ');
+    // Replace non-breaking spaces with standard space to avoid hydration mismatch between Node and Browser
+    return formatted.replace(/\u00a0/g, ' ');
+  } catch (e) {
+    return `${curr} ${amount.toFixed(2)}`;
+  }
 }
 
 export function filterTransactionsByPeriod<T extends { transactionDate?: string }>(

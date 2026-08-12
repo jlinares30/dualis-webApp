@@ -111,7 +111,7 @@ export function SavingsRateGauge({ period }: SavingsRateGaugeProps) {
               <div className="text-right">
                 <span className="text-xs font-bold text-emerald-400 flex items-center justify-end gap-0.5">
                   <ArrowUpRight className="w-3.5 h-3.5" />
-                  {formatCurrency(netSavings, 'PEN')}
+                  {formatCurrency(netSavings, summary?.currency || 'PEN')}
                 </span>
                 <span className="text-[10px] text-gray-500 block">Excedente Libre</span>
               </div>

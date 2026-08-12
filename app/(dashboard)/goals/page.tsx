@@ -7,7 +7,10 @@ import { useGoals, useCreateGoal, useDepositGoal, useDeleteGoal } from '@/hooks/
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export default function GoalsPage() {
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
+
   const { data: goals = [], isLoading } = useGoals();
   const { mutateAsync: createGoalMut, isPending: isCreating } = useCreateGoal();
   const { mutateAsync: depositGoalMut } = useDepositGoal();
@@ -35,7 +38,7 @@ export default function GoalsPage() {
         targetAmount: parseFloat(targetAmount),
         currentAmount: currentAmount ? parseFloat(currentAmount) : 0,
         category,
-        currency: 'PEN',
+        currency,
       });
       setModalOpen(false);
       setName('');
@@ -161,7 +164,7 @@ export default function GoalsPage() {
                     <div className="flex items-baseline justify-between text-xs">
                       <span className="text-2xl font-extrabold text-white">{pct}%</span>
                       <span className="text-gray-400 font-medium">
-                        {formatCurrency(goal.currentAmount, goal.currency || 'PEN')} / {formatCurrency(goal.targetAmount, goal.currency || 'PEN')}
+                        {formatCurrency(goal.currentAmount, goal.currency || currency)} / {formatCurrency(goal.targetAmount, goal.currency || currency)}
                       </span>
                     </div>
 

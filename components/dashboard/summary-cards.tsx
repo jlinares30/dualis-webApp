@@ -4,9 +4,10 @@ import React from 'react';
 import { Wallet, TrendingDown, Users, ArrowUpRight } from 'lucide-react';
 import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { WorkspaceType } from '@/types/finance';
-import { useDashboardSummary } from '@/hooks/useFinanceQuery';
+import { useDashboardSummary } from '@/hooks/useDashboard';
 import { useTransactions } from '@/hooks/useTransactions';
 import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 interface SummaryCardsProps {
   workspace: WorkspaceType;
@@ -15,6 +16,9 @@ interface SummaryCardsProps {
 
 export function SummaryCards({ workspace, period }: SummaryCardsProps) {
   const isCouple = workspace === 'couple';
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+
   const { data: summaryData, isLoading: isLoadingSummary } = useDashboardSummary();
   const { data: txPage, isLoading: isLoadingTx } = useTransactions(0, 200);
 
@@ -50,7 +54,7 @@ export function SummaryCards({ workspace, period }: SummaryCardsProps) {
 
   const totalBalance = summaryData?.totalBalance ?? summaryData?.totalLiquidity ?? 0;
   const exceededCount = summaryData?.exceededBudgetsCount ?? 0;
-  const currency = summaryData?.currency || 'PEN';
+  const currency = activeWs?.currency || summaryData?.currency || 'PEN';
   const isLoading = isLoadingSummary || isLoadingTx;
 
   const metrics = [
@@ -113,7 +117,7 @@ export function SummaryCards({ workspace, period }: SummaryCardsProps) {
                 {isLoading ? (
                   <span className="inline-block w-24 h-7 bg-gray-800 animate-pulse rounded-lg" />
                 ) : (
-                  formatCurrency(item.amount, summaryData?.currency || 'PEN')
+                  formatCurrency(item.amount, currency)
                 )}
               </h3>
               <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">

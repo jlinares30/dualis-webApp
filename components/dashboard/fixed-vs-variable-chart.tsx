@@ -13,11 +13,16 @@ import { Layers, ShieldCheck, ShoppingBag } from 'lucide-react';
 import { useTransactions } from '@/hooks/useTransactions';
 import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+
 interface FixedVsVariableChartProps {
   period?: DateFilterOption;
 }
 
 export function FixedVsVariableChart({ period }: FixedVsVariableChartProps) {
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
   const { data: pageData, isLoading } = useTransactions(0, 200);
 
   const { fixedAmount, variableAmount, totalExpenses, chartData } = React.useMemo(() => {
@@ -103,7 +108,7 @@ export function FixedVsVariableChart({ period }: FixedVsVariableChartProps) {
                               {data.name}
                             </p>
                             <p className="text-amber-400 font-semibold">
-                              {formatCurrency(data.value, 'PEN')}
+                              {formatCurrency(data.value, currency)}
                             </p>
                           </div>
                         );
@@ -134,7 +139,7 @@ export function FixedVsVariableChart({ period }: FixedVsVariableChartProps) {
                   <span className="block font-semibold">Gastos Fijos</span>
                   <span className="text-[10px] text-gray-400">{fixedPct}% del egreso</span>
                 </div>
-                <span className="font-bold text-white">{formatCurrency(fixedAmount, 'PEN')}</span>
+                <span className="font-bold text-white">{formatCurrency(fixedAmount, currency)}</span>
               </div>
 
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 flex items-center justify-between">
@@ -142,7 +147,7 @@ export function FixedVsVariableChart({ period }: FixedVsVariableChartProps) {
                   <span className="block font-semibold">Gastos Variables</span>
                   <span className="text-[10px] text-gray-400">{varPct}% del egreso</span>
                 </div>
-                <span className="font-bold text-white">{formatCurrency(variableAmount, 'PEN')}</span>
+                <span className="font-bold text-white">{formatCurrency(variableAmount, currency)}</span>
               </div>
             </div>
           </div>

@@ -14,6 +14,8 @@ import { useTransactions } from '@/hooks/useTransactions';
 import { useCategories } from '@/hooks/useCategories';
 import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+
 const CATEGORY_COLORS = [
   '#6366f1', // Indigo
   '#ec4899', // Pink
@@ -39,6 +41,9 @@ interface CategoryDistributionChartProps {
 }
 
 export function CategoryDistributionChart({ period }: CategoryDistributionChartProps) {
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
   const { data: pageData, isLoading: isLoadingTx } = useTransactions(0, 200);
   const { data: categories = [], isLoading: isLoadingCat } = useCategories('EXPENSE');
 
@@ -122,7 +127,7 @@ export function CategoryDistributionChart({ period }: CategoryDistributionChartP
                               {data.name}
                             </p>
                             <p className="text-indigo-400 font-semibold">
-                              {formatCurrency(data.value, 'PEN')} ({data.percentage}%)
+                              {formatCurrency(data.value, currency)} ({data.percentage}%)
                             </p>
                           </div>
                         );
@@ -150,7 +155,7 @@ export function CategoryDistributionChart({ period }: CategoryDistributionChartP
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
                 <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider">Total Gastado</span>
                 <span className="text-xs font-extrabold text-white">
-                  {formatCurrency(totalExpenses, 'PEN')}
+                  {formatCurrency(totalExpenses, currency)}
                 </span>
               </div>
             </div>
@@ -167,7 +172,7 @@ export function CategoryDistributionChart({ period }: CategoryDistributionChartP
                     <span className="text-gray-300 font-medium truncate">{item.name}</span>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="block font-bold text-white">{formatCurrency(item.value, 'PEN')}</span>
+                    <span className="block font-bold text-white">{formatCurrency(item.value, currency)}</span>
                     <span className="block text-[10px] text-gray-400">{item.percentage}%</span>
                   </div>
                 </div>

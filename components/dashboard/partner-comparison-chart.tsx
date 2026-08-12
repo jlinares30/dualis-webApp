@@ -24,7 +24,9 @@ interface PartnerComparisonChartProps {
 
 export function PartnerComparisonChart({ period }: PartnerComparisonChartProps) {
   const { user } = useAuthStore();
-  const { partnerName } = useWorkspaceStore();
+  const { partnerName, activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
   const { data: pageData, isLoading } = useTransactions(0, 200);
 
   const myName = user?.fullName?.split(' ')[0] || 'Tú';
@@ -61,9 +63,9 @@ export function PartnerComparisonChart({ period }: PartnerComparisonChartProps) 
     const diff = Math.abs(mine - partner) / 2;
     let settlement = 'Aportes parejos en el hogar.';
     if (mine > partner) {
-      settlement = `${partnerLabel} te compensa ${formatCurrency(diff, 'PEN')}`;
+      settlement = `${partnerLabel} te compensa ${formatCurrency(diff, currency)}`;
     } else if (partner > mine) {
-      settlement = `Le compensas ${formatCurrency(diff, 'PEN')} a ${partnerLabel}`;
+      settlement = `Le compensas ${formatCurrency(diff, currency)} a ${partnerLabel}`;
     }
 
     return {
@@ -131,7 +133,7 @@ export function PartnerComparisonChart({ period }: PartnerComparisonChartProps) 
                               {data.name}
                             </p>
                             <p className="text-gray-200 font-semibold">
-                              Pagado: {formatCurrency(data.amount, 'PEN')}
+                              Pagado: {formatCurrency(data.amount, currency)}
                             </p>
                           </div>
                         );
@@ -151,11 +153,11 @@ export function PartnerComparisonChart({ period }: PartnerComparisonChartProps) 
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 flex items-center justify-between">
                 <span className="font-semibold">{myName}</span>
-                <span className="font-bold text-white">{formatCurrency(myTotal, 'PEN')}</span>
+                <span className="font-bold text-white">{formatCurrency(myTotal, currency)}</span>
               </div>
               <div className="p-3 rounded-xl bg-pink-500/10 border border-pink-500/20 text-pink-300 flex items-center justify-between">
                 <span className="font-semibold">{partnerLabel}</span>
-                <span className="font-bold text-white">{formatCurrency(partnerTotal, 'PEN')}</span>
+                <span className="font-bold text-white">{formatCurrency(partnerTotal, currency)}</span>
               </div>
             </div>
           </div>

@@ -16,6 +16,8 @@ import { CalendarDays, Flame } from 'lucide-react';
 import { useTransactions } from '@/hooks/useTransactions';
 import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
 
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+
 const DAYS_OF_WEEK = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 const DAY_COLORS = ['#f43f5e', '#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'];
 
@@ -24,6 +26,9 @@ interface ExpenseHeatmapChartProps {
 }
 
 export function ExpenseHeatmapChart({ period }: ExpenseHeatmapChartProps) {
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const currency = activeWs?.currency || 'PEN';
   const { data: pageData, isLoading } = useTransactions(0, 200);
 
   const { chartData, peakDay, peakAmount } = React.useMemo(() => {
@@ -86,7 +91,7 @@ export function ExpenseHeatmapChart({ period }: ExpenseHeatmapChartProps) {
 
         {hasData && (
           <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 inline-flex items-center gap-1">
-            <Flame className="w-3 h-3" /> Día de pico: {peakDay} ({formatCurrency(peakAmount, 'PEN')})
+            <Flame className="w-3 h-3" /> Día de pico: {peakDay} ({formatCurrency(peakAmount, currency)})
           </span>
         )}
       </div>
@@ -108,7 +113,7 @@ export function ExpenseHeatmapChart({ period }: ExpenseHeatmapChartProps) {
               <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                 <XAxis dataKey="day" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `S/ ${val}`} />
+                <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}`} />
                 <Tooltip
                   cursor={{ fill: 'rgba(255, 255, 255, 0.05)' }}
                   content={({ active, payload }) => {
@@ -121,7 +126,7 @@ export function ExpenseHeatmapChart({ period }: ExpenseHeatmapChartProps) {
                             Día: {data.day}
                           </p>
                           <p className="text-rose-400 font-semibold">
-                            Total Gastado: {formatCurrency(data.total, 'PEN')}
+                            Total Gastado: {formatCurrency(data.total, currency)}
                           </p>
                         </div>
                       );
