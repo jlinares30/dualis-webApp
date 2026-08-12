@@ -31,7 +31,7 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
           email,
           password,
           fullName,
-          baseCurrency: 'COP',
+          baseCurrency: 'PEN',
         });
 
       } else {

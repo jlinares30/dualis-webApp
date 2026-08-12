@@ -28,7 +28,7 @@ export default function RegisterPage() {
         email,
         password,
         fullName,
-        baseCurrency: 'COP',
+        baseCurrency: 'PEN',
       });
 
 
@@ -37,7 +37,7 @@ export default function RegisterPage() {
           id: response.id,
           email: response.email,
           fullName: response.name || fullName,
-          preferredCurrency: 'COP',
+          preferredCurrency: 'PEN',
         });
       }
 

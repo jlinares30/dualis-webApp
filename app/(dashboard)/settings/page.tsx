@@ -16,6 +16,7 @@ import {
   Sparkles,
   Percent
 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore, DefaultSplitRule } from '@/lib/stores/useWorkspaceStore';
 import { useUpdateUserProfile } from '@/hooks/useUserProfile';
@@ -23,9 +24,10 @@ import { useInviteCode, useJoinWorkspace, useUnlinkPartner, useUpdateWorkspace, 
 import { useCreateSplitRule } from '@/hooks/useSplitRules';
 
 export default function SettingsPage() {
+  const queryClient = useQueryClient();
   const { user } = useAuthStore();
   const { mutateAsync: updateProfile, isPending } = useUpdateUserProfile();
-  const { data: inviteData, refetch: refetchInviteCode } = useInviteCode();
+  const { data: inviteData } = useInviteCode();
   const { mutateAsync: joinWorkspaceMut, isPending: isJoining } = useJoinWorkspace();
   const { mutateAsync: unlinkWorkspaceMut, isPending: isUnlinking } = useUnlinkPartner();
   const { mutateAsync: updateWorkspaceMut } = useUpdateWorkspace();
@@ -75,9 +77,9 @@ export default function SettingsPage() {
 
       if (created?.id) {
         setActiveWorkspace(created.id, 'COUPLE');
-        linkPartner(partnerInputName || 'Pareja', created.invitationCode || 'Código Generado', selectedRule);
+        const codeToLink = created.invitationCode || created.inviteCode || 'Código Generado';
+        linkPartner(partnerInputName || 'Pareja', codeToLink, selectedRule);
         setJoinSuccess('Espacio de Pareja creado con éxito. Comparte el código con tu pareja.');
-        refetchInviteCode();
       }
     } catch (err: any) {
       console.error('Error al crear espacio pareja:', err);
@@ -141,6 +143,7 @@ export default function SettingsPage() {
             id: activeWorkspaceId,
             data: { currency },
           });
+          useWorkspaceStore.getState().updateWorkspaceCurrency(activeWorkspaceId, currency);
         } catch (wErr) {
           console.error('Error al actualizar workspace en API:', wErr);
         }
@@ -152,19 +155,31 @@ export default function SettingsPage() {
                 : selectedRule === 'PERCENTAGE' ? 'CUSTOM_PERCENTAGE'
                   : 'EQUAL';
 
-            await createSplitRuleMut({
+            const payload: any = {
               workspaceId: activeWorkspaceId,
               name: `Regla por defecto ${selectedRule}`,
               splitType: apiSplitType,
-              partnerAPercentage: userPct,
-              partnerBPercentage: 100 - userPct,
+              partnerAPercentage: selectedRule === 'EQUALLY' ? 50 : userPct,
+              partnerBPercentage: selectedRule === 'EQUALLY' ? 50 : 100 - userPct,
               isDefault: true,
-            });
+            };
+
+            if (apiSplitType === 'PROPORTIONAL') {
+              payload.partnerAIncome = userPct;
+              payload.partnerBIncome = 100 - userPct;
+            }
+
+            await createSplitRuleMut(payload);
           } catch (ruleErr) {
             console.error('Error al guardar regla de división en API:', ruleErr);
           }
         }
       }
+
+      setDefaultSplitRule(selectedRule, userPct);
+      queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['debtBalanceSummary'] });
 
       setDefaultSplitRule(selectedRule, userPct);
       setSaved(true);
