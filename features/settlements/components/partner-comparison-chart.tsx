@@ -13,10 +13,10 @@ import {
 } from 'recharts';
 import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { Users, HeartHandshake, ArrowRightLeft } from 'lucide-react';
-import { useTransactions } from '@/hooks/useTransactions';
+import { useTransactions } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
-import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
+import { DateFilterOption } from '@/features/dashboard/components/dashboard-date-filter';
 
 interface PartnerComparisonChartProps {
   period?: DateFilterOption;

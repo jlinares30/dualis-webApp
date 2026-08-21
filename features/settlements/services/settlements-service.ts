@@ -1,5 +1,5 @@
-import { apiFetch } from '../api';
-import { DebtBalanceSummaryDTO, SettlementDTO, CreateSettlementPayload } from '@/types/settlements';
+import { apiFetch } from '@/lib/api';
+import { DebtBalanceSummaryDTO, SettlementDTO, CreateSettlementPayload } from '@/types';
 
 export async function getDebtBalanceSummary(workspaceId: string): Promise<DebtBalanceSummaryDTO> {
   return apiFetch<DebtBalanceSummaryDTO>(`/settlements/balance-summary?workspaceId=${encodeURIComponent(workspaceId)}`);

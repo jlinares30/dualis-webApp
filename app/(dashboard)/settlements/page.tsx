@@ -17,7 +17,7 @@ import {
 import { formatCurrency } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
-import { useDebtBalanceSummary, useSettlementsHistory, useCreateSettlement } from '@/hooks/useSettlements';
+import { useDebtBalanceSummary, useSettlementsHistory, useCreateSettlement } from '@/features/settlements';
 import Link from 'next/link';
 
 export default function SettlementPage() {

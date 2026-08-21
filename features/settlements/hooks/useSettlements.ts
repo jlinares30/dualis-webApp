@@ -4,8 +4,8 @@ import {
   getSettlementsByWorkspace,
   createSettlement,
   completeSettlement,
-} from '@/lib/services/settlements-service';
-import { CreateSettlementPayload } from '@/types/settlements';
+} from '@/lib/services';
+import { CreateSettlementPayload } from '@/types';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
