@@ -1,7 +1,7 @@
 import React from 'react';
 import { PiggyBank, AlertTriangle, CheckCircle2, AlertCircle, ArrowRight, PieChart } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
-import { useBudgets } from '@/hooks/useBudgets';
+import { useBudgets } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import Link from 'next/link';
 

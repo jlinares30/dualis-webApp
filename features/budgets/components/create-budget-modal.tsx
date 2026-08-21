@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, PieChart, AlertCircle } from 'lucide-react';
-import { useCreateBudget } from '@/hooks/useBudgets';
+import { useCreateBudget } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
-import { useCategories, useCreateCategory } from '@/hooks/useCategories';
+import { useCategories, useCreateCategory } from '@/hooks';
 
 interface CreateBudgetModalProps {
   isOpen: boolean;

@@ -12,10 +12,7 @@ import {
   Target
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
-import { BudgetCategory } from '@/types/finance';
-import { CreateBudgetModal } from '@/components/modals/create-budget-modal';
-
-import { useBudgets } from '@/hooks/useBudgets';
+import { useBudgets, CreateBudgetModal, BudgetCategory } from '@/features/budgets';
 
 export default function BudgetsPage() {
   const { data: apiBudgets, isLoading } = useBudgets();

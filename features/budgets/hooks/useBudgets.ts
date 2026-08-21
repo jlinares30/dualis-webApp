@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getBudgets, createBudget, deleteBudget, CreateBudgetRequest } from '@/lib/services/budgets-service';
+import { getBudgets, createBudget, deleteBudget, CreateBudgetRequest } from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 

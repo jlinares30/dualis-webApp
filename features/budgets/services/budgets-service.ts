@@ -1,28 +1,7 @@
-import { apiFetch } from '../api';
+import { apiFetch } from '@/lib/api';
+import { BudgetDTO, CreateBudgetRequest } from '../types/budgets';
 
-export interface BudgetDTO {
-  id: string;
-  name: string;
-  categoryId?: string;
-  categoryName?: string;
-  limitAmount: number;
-  spentAmount: number;
-  currency: string;
-  workspaceId?: string;
-  startDate?: string;
-  endDate?: string;
-}
-
-export interface CreateBudgetRequest {
-  workspaceId: string;
-  name: string;
-  categoryId?: string;
-  amount?: number;
-  limitAmount?: number;
-  currency?: string;
-  periodMonth?: number;
-  periodYear?: number;
-}
+export type { BudgetDTO, CreateBudgetRequest };
 
 export async function getBudgets(workspaceId?: string): Promise<BudgetDTO[]> {
   if (!workspaceId) return [];
