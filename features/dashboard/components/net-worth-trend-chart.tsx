@@ -13,8 +13,8 @@ import {
 } from 'recharts';
 import { formatCurrency } from '@/lib/utils';
 import { Landmark, TrendingUp, Wallet, Shield } from 'lucide-react';
-import { useAccounts } from '@/hooks/useAccounts';
-import { useInvestments } from '@/hooks/useInvestments';
+import { useAccounts } from '@/hooks';
+import { useInvestments } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function NetWorthTrendChart() {

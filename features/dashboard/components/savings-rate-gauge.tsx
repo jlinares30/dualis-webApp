@@ -3,9 +3,9 @@
 import React from 'react';
 import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { ShieldCheck, ShieldAlert, Sparkles, ArrowUpRight, PiggyBank } from 'lucide-react';
-import { useDashboardSummary } from '@/hooks/useDashboard';
-import { useTransactions } from '@/hooks/useTransactions';
-import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
+import { useDashboardSummary } from '@/hooks';
+import { useTransactions } from '@/hooks';
+import { DateFilterOption } from '@/features/dashboard/components/dashboard-date-filter';
 
 interface SavingsRateGaugeProps {
   period?: DateFilterOption;

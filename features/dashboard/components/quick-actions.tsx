@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { PlusCircle, Split } from 'lucide-react';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
-import { CreateTransactionModal } from '@/components/modals/create-transaction-modal';
+import { CreateTransactionModal } from '@/features/transactions/components/create-transaction-modal';
 
 interface QuickActionsProps {
   workspace?: 'personal' | 'couple';

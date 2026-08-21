@@ -13,8 +13,8 @@ import {
 } from 'recharts';
 import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { BarChart3, TrendingUp } from 'lucide-react';
-import { useTransactions } from '@/hooks/useTransactions';
-import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
+import { useTransactions } from '@/hooks';
+import { DateFilterOption } from '@/features/dashboard/components/dashboard-date-filter';
 
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 

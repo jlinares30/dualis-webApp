@@ -1,8 +1,8 @@
 import React from 'react';
 import { Users, User } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { WorkspaceType, Transaction } from '@/types/finance';
-import { useTransactions } from '@/hooks/useTransactions';
+import { WorkspaceType, Transaction } from '@/types';
+import { useTransactions } from '@/hooks';
 import { getTransactionIconAndStyle } from '@/lib/transaction-icons';
 
 import { ExportButton } from '@/components/ui/export-button';

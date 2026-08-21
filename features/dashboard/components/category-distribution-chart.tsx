@@ -10,9 +10,9 @@ import {
 } from 'recharts';
 import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { PieChart as PieIcon } from 'lucide-react';
-import { useTransactions } from '@/hooks/useTransactions';
-import { useCategories } from '@/hooks/useCategories';
-import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
+import { useTransactions } from '@/hooks';
+import { useCategories } from '@/hooks';
+import { DateFilterOption } from '@/features/dashboard/components/dashboard-date-filter';
 
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 

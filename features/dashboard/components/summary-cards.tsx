@@ -3,10 +3,10 @@
 import React from 'react';
 import { Wallet, TrendingDown, Users, ArrowUpRight } from 'lucide-react';
 import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
-import { WorkspaceType } from '@/types/finance';
-import { useDashboardSummary } from '@/hooks/useDashboard';
-import { useTransactions } from '@/hooks/useTransactions';
-import { DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
+import { WorkspaceType } from '@/types';
+import { useDashboardSummary } from '@/hooks';
+import { useTransactions } from '@/hooks';
+import { DateFilterOption } from '@/features/dashboard/components/dashboard-date-filter';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 interface SummaryCardsProps {

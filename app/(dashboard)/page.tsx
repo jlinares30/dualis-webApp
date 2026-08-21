@@ -1,22 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
-import { SummaryCards } from '@/components/dashboard/summary-cards';
-import { QuickActions } from '@/components/dashboard/quick-actions';
-import { RecentTransactions } from '@/components/dashboard/recent-transactions';
-import { BudgetWidget } from '@/components/dashboard/budget-widget';
-import { CashFlowChart } from '@/components/dashboard/cash-flow-chart';
-import { CategoryDistributionChart } from '@/components/dashboard/category-distribution-chart';
-import { SavingsRateGauge } from '@/components/dashboard/savings-rate-gauge';
-import { PartnerComparisonChart } from '@/components/dashboard/partner-comparison-chart';
-import { NetWorthTrendChart } from '@/components/dashboard/net-worth-trend-chart';
-import { ExpenseHeatmapChart } from '@/components/dashboard/expense-heatmap-chart';
-import { MonthlyTrendBarChart } from '@/components/dashboard/monthly-trend-bar-chart';
-import { FixedVsVariableChart } from '@/components/dashboard/fixed-vs-variable-chart';
-import { GoalsWidget } from '@/components/dashboard/goals-widget';
-import { UpcomingBillsWidget } from '@/components/dashboard/upcoming-bills-widget';
-import { DashboardDateFilter, DateFilterOption } from '@/components/dashboard/dashboard-date-filter';
-import { WorkspaceType } from '@/types/finance';
+import { 
+  SummaryCards,
+  QuickActions,
+  RecentTransactions,
+  CashFlowChart,
+  CategoryDistributionChart,
+  SavingsRateGauge,
+  NetWorthTrendChart,
+  ExpenseHeatmapChart,
+  MonthlyTrendBarChart,
+  FixedVsVariableChart,
+  DashboardDateFilter,
+  DateFilterOption,
+} from '@/features/dashboard';
+import { BudgetWidget } from '@/features/budgets';
+import { GoalsWidget } from '@/features/goals';
+import { UpcomingBillsWidget } from '@/features/subscriptions';
+import { PartnerComparisonChart } from '@/features/settlements';
+import { WorkspaceType } from '@/types';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { Sparkles } from 'lucide-react';
 

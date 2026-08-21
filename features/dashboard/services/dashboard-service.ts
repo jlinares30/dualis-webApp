@@ -1,5 +1,5 @@
-import { apiFetch } from '../api';
-import { DashboardSummaryDTO } from '@/types/finance';
+import { apiFetch } from '@/lib/api';
+import { DashboardSummaryDTO } from '@/types';
 
 export async function getDashboardSummary(workspaceId?: string): Promise<DashboardSummaryDTO> {
   const queryParam = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : '';
