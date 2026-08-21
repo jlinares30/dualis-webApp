@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, Wallet, Landmark, CreditCard, Sparkles } from 'lucide-react';
-import { useCreateAccount } from '@/hooks/useAccounts';
+import { useCreateAccount } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 interface CreateAccountModalProps {

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAccounts, createAccount, updateAccount, deleteAccount, CreateAccountRequest } from '@/lib/services/accounts-service';
+import { getAccounts, createAccount, updateAccount, deleteAccount, CreateAccountRequest } from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 

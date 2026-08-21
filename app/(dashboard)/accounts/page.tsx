@@ -6,85 +6,54 @@ import {
   CreditCard, 
   Landmark, 
   Plus, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
-  CheckCircle2, 
   TrendingUp,
-  Sparkles,
-  DollarSign
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { WorkspaceType } from '@/types/finance';
-import { CreateAccountModal } from '@/components/modals/create-account-modal';
-import { useAccounts } from '@/hooks/useAccounts';
-
-interface AccountItem {
-  id: string;
-  name: string;
-  type: 'bank' | 'cash' | 'credit' | 'digital';
-  balance: number;
-  currency: string;
-  accountNumber?: string;
-  color: string;
-  workspace: 'personal' | 'couple';
-}
-
-const mockAccounts: AccountItem[] = [
-  {
-    id: 'acc-1',
-    name: 'BCP / Yape Principal',
-    type: 'digital',
-    balance: 1450,
-    currency: 'PEN',
-    accountNumber: '*4821',
-    color: 'from-purple-600 to-indigo-600',
-    workspace: 'personal',
-  },
-  {
-    id: 'acc-2',
-    name: 'BBVA Ahorros (Pareja)',
-    type: 'bank',
-    balance: 3400,
-    currency: 'PEN',
-    accountNumber: '*9012',
-    color: 'from-emerald-600 to-teal-600',
-    workspace: 'couple',
-  },
-  {
-    id: 'acc-3',
-    name: 'Tarjeta de Crédito Interbank',
-    type: 'credit',
-    balance: -680,
-    currency: 'PEN',
-    accountNumber: '*1154',
-    color: 'from-rose-600 to-pink-600',
-    workspace: 'personal',
-  },
-  {
-    id: 'acc-4',
-    name: 'Efectivo Caja Menor',
-    type: 'cash',
-    balance: 250,
-    currency: 'PEN',
-    color: 'from-amber-600 to-yellow-600',
-    workspace: 'couple',
-  },
-];
+import { WorkspaceType } from '@/types';
+import { useAccounts, CreateAccountModal, AccountItem, AccountCategory } from '@/features/accounts';
 
 export default function AccountsPage({ workspace = 'personal' }: { workspace?: WorkspaceType }) {
   const { data: apiAccounts, isLoading } = useAccounts();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const getAccountColor = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'credit':
+      case 'credit_card':
+        return 'from-rose-600 to-pink-600';
+      case 'bank':
+      case 'savings':
+        return 'from-emerald-600 to-teal-600';
+      case 'digital':
+        return 'from-purple-600 to-indigo-600';
+      case 'cash':
+        return 'from-amber-600 to-yellow-600';
+      case 'investment':
+        return 'from-cyan-600 to-blue-600';
+      default:
+        return 'from-indigo-600 to-blue-600';
+    }
+  };
+
+  const getAccountCategory = (type: string): AccountCategory => {
+    const lower = type.toLowerCase();
+    if (lower.includes('credit')) return 'credit';
+    if (lower.includes('cash')) return 'cash';
+    if (lower.includes('digital') || lower.includes('yape') || lower.includes('plin')) return 'digital';
+    if (lower.includes('investment')) return 'investment';
+    return 'bank';
+  };
+
   const accounts: AccountItem[] = apiAccounts
     ? apiAccounts.map((a) => ({
         id: a.id,
         name: a.name,
-        type: (a.type?.toLowerCase() as any) || 'bank',
+        type: getAccountCategory(a.type || 'bank'),
         balance: a.balance,
         currency: a.currency || 'PEN',
         accountNumber: a.accountNumber,
-        color: a.color || 'from-indigo-600 to-blue-600',
-        workspace: 'personal',
+        color: a.color || getAccountColor(a.type || 'bank'),
+        workspace: (workspace as 'personal' | 'couple') || 'personal',
       }))
     : [];
 

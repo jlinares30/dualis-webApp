@@ -1,26 +1,7 @@
-import { apiFetch } from '../api';
+import { apiFetch } from '@/lib/api';
+import { AccountDTO, CreateAccountRequest } from '../types/accounts';
 
-export interface AccountDTO {
-  id: string;
-  name: string;
-  type: string;
-  balance: number;
-  currency: string;
-  accountNumber?: string;
-  description?: string;
-  color?: string;
-  workspaceId?: string;
-}
-
-export interface CreateAccountRequest {
-  workspaceId: string;
-  name: string;
-  type: 'BANK' | 'CASH' | 'CREDIT_CARD' | 'INVESTMENT' | 'SAVINGS' | 'LOAN' | string;
-  balance: number;
-  initialBalance?: number;
-  currency?: string;
-  description?: string;
-}
+export type { AccountDTO, CreateAccountRequest };
 
 export async function getAccounts(workspaceId: string): Promise<AccountDTO[]> {
   return apiFetch<AccountDTO[]>(`/accounts?workspaceId=${encodeURIComponent(workspaceId)}`);
