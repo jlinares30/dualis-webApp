@@ -15,7 +15,7 @@ import {
   LogOut,
   LogIn
 } from 'lucide-react';
-import { WorkspaceType } from '@/types/finance';
+import { WorkspaceType } from '@/types';
 import { cn } from '@/lib/utils';
 import { getMe } from '@/lib/auth';
 import { useAuthStore } from '@/lib/stores/useAuthStore';

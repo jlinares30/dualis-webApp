@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { WorkspaceDTO } from '@/types/finance';
+import { WorkspaceDTO } from '@/types';
 
 export type DefaultSplitRule = 'EQUALLY' | 'PROPORTIONAL_INCOME' | 'PERCENTAGE' | 'FIXED_AMOUNT';
 

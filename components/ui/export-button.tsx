@@ -3,7 +3,7 @@
 import React from 'react';
 import { Download, FileSpreadsheet } from 'lucide-react';
 import { exportTransactionsToCSV } from '@/lib/export-utils';
-import { TransactionDTO } from '@/types/transactions';
+import { TransactionDTO } from '@/types';
 
 interface ExportButtonProps {
   transactions: TransactionDTO[];

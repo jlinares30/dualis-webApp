@@ -1,4 +1,4 @@
-import { TransactionDTO } from '@/types/transactions';
+import { TransactionDTO } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 
 /**

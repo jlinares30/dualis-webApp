@@ -1,6 +1,10 @@
-export * from './workspaces';
-export * from './dashboard';
-export * from './transactions';
-export * from './budgets';
-export * from './settlements';
-
+export * from '@/features/auth/types/auth';
+export * from '@/features/accounts/types/accounts';
+export * from '@/features/budgets/types/budgets';
+export * from '@/features/transactions/types/transactions';
+export * from '@/features/goals/types/goals';
+export * from '@/features/investments/types/investments';
+export * from '@/features/subscriptions/types/subscriptions';
+export * from '@/features/settlements/types/settlements';
+export * from '@/features/workspaces/types/workspaces';
+export * from '@/features/dashboard/types/dashboard';

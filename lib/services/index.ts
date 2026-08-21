@@ -1,11 +1,12 @@
-export * from './dashboard-service';
-export * from './transactions-service';
-export * from './workspaces-service';
-export * from './budgets-service';
-export * from './split-rules-service';
-export * from './categories-service';
-export * from './investments-service';
-export * from './settlements-service';
-
-
-
+export * from '@/features/auth/services/users-service';
+export * from '@/features/accounts/services/accounts-service';
+export * from '@/features/budgets/services/budgets-service';
+export * from '@/features/transactions/services/transactions-service';
+export * from '@/features/transactions/services/categories-service';
+export * from '@/features/transactions/services/split-rules-service';
+export * from '@/features/goals/services/goals-service';
+export * from '@/features/investments/services/investments-service';
+export * from '@/features/subscriptions/services/subscriptions-service';
+export * from '@/features/settlements/services/settlements-service';
+export * from '@/features/workspaces/services/workspaces-service';
+export * from '@/features/dashboard/services/dashboard-service';
