@@ -5,7 +5,7 @@ import {
   updateSplitRule, 
   deleteSplitRule, 
   CreateSplitRulePayload 
-} from '@/lib/services/split-rules-service';
+} from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 

@@ -1,4 +1,4 @@
-import { apiFetch } from '../api';
+import { apiFetch } from '@/lib/api';
 
 export type SplitType = 'EQUAL' | 'PROPORTIONAL' | 'CUSTOM_PERCENTAGE' | 'FIXED_AMOUNT';
 

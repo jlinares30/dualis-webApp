@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCategories, createCategory, CreateCategoryRequest, CategoryDTO } from '@/lib/services/categories-service';
+import { getCategories, createCategory, CreateCategoryRequest, CategoryDTO } from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 

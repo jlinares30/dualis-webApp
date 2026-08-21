@@ -10,10 +10,9 @@ import {
   Download
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { WorkspaceType, Transaction } from '@/types/finance';
-import { CreateTransactionModal } from '@/components/modals/create-transaction-modal';
+import { WorkspaceType } from '@/types';
+import { useTransactions, CreateTransactionModal, Transaction } from '@/features/transactions';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
-import { useTransactions } from '@/hooks/useTransactions';
 import { getTransactionIconAndStyle } from '@/lib/transaction-icons';
 
 export default function TransactionsPage({ workspace = 'personal' }: { workspace?: WorkspaceType }) {

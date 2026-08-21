@@ -1,5 +1,5 @@
-import { apiFetch } from '../api';
-import { TransactionDTO, CreateTransactionRequest } from '@/types/finance';
+import { apiFetch } from '@/lib/api';
+import { TransactionDTO, CreateTransactionRequest } from '@/types';
 
 export interface PaginatedResponse<T> {
   content: T[];

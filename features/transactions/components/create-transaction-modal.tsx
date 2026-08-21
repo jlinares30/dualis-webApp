@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, Receipt, Split, Sparkles, Wallet, PieChart, Percent, DollarSign } from 'lucide-react';
 import { useWorkspaceStore, DefaultSplitRule } from '@/lib/stores/useWorkspaceStore';
-import { useCreateTransaction } from '@/hooks/useTransactions';
-import { useAccounts, useCreateAccount } from '@/hooks/useAccounts';
-import { useCategories, useCreateCategory } from '@/hooks/useCategories';
+import { useCreateTransaction } from '@/hooks';
+import { useAccounts, useCreateAccount } from '@/hooks';
+import { useCategories, useCreateCategory } from '@/hooks';
 
 interface CreateTransactionModalProps {
   isOpen: boolean;
