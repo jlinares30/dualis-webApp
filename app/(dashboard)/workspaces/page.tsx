@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
-import { useWorkspaceDetails, useInviteCode, useJoinWorkspace, useWorkspaces } from '@/hooks/useWorkspaces';
+import { useWorkspaceDetails, useInviteCode, useJoinWorkspace, useWorkspaces } from '@/hooks';
 
 export default function WorkspacesPage() {
   const { user } = useAuthStore();

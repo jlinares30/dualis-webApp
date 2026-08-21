@@ -8,7 +8,7 @@ import {
   getInviteCode, 
   joinWorkspaceByCode, 
   unlinkPartnerWorkspace 
-} from '@/lib/services/workspaces-service';
+} from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 

@@ -1,5 +1,5 @@
-import { apiFetch } from '../api';
-import { WorkspaceDTO } from '@/types/finance';
+import { apiFetch } from '@/lib/api';
+import { WorkspaceDTO } from '@/types';
 
 export interface InviteCodeResponse {
   code: string;

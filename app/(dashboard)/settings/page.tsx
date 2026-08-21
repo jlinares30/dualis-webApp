@@ -19,9 +19,9 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore, DefaultSplitRule } from '@/lib/stores/useWorkspaceStore';
-import { useUpdateUserProfile } from '@/hooks/useUserProfile';
-import { useInviteCode, useJoinWorkspace, useUnlinkPartner, useUpdateWorkspace, useCreateWorkspace } from '@/hooks/useWorkspaces';
-import { useCreateSplitRule } from '@/hooks/useSplitRules';
+import { useUpdateUserProfile } from '@/features/auth';
+import { useInviteCode, useJoinWorkspace, useUnlinkPartner, useUpdateWorkspace, useCreateWorkspace } from '@/features/workspaces';
+import { useCreateSplitRule } from '@/features/transactions';
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
