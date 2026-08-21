@@ -1,5 +1,5 @@
-import { apiFetch } from '../api';
-import { SubscriptionDTO, CreateSubscriptionRequest } from '@/types/subscriptions';
+import { apiFetch } from '@/lib/api';
+import { SubscriptionDTO, CreateSubscriptionRequest } from '@/types';
 
 export async function getSubscriptions(workspaceId?: string): Promise<SubscriptionDTO[]> {
   if (!workspaceId) return [];

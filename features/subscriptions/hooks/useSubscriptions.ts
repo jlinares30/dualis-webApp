@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getSubscriptions, createSubscription, toggleSubPaidStatus, deleteSubscription } from '@/lib/services/subscriptions-service';
-import { CreateSubscriptionRequest } from '@/types/subscriptions';
+import { getSubscriptions, createSubscription, toggleSubPaidStatus, deleteSubscription } from '@/lib/services';
+import { CreateSubscriptionRequest } from '@/types';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 

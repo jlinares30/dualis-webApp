@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Calendar, Plus, CheckCircle2, Clock, Trash2, Home, Zap, Tv, Shield, BookOpen, Layers } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useSubscriptions, useCreateSubscription, useToggleSubscriptionPaid, useDeleteSubscription } from '@/hooks/useSubscriptions';
+import { useSubscriptions, useCreateSubscription, useToggleSubscriptionPaid, useDeleteSubscription } from '@/features/subscriptions';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export default function SubscriptionsPage() {

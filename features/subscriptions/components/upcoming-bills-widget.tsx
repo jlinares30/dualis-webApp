@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Calendar, ChevronRight, CheckCircle2, Clock, Plus, Zap, Tv, Home, Shield, BookOpen, Layers } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useSubscriptions, useToggleSubscriptionPaid } from '@/hooks/useSubscriptions';
+import { useSubscriptions, useToggleSubscriptionPaid } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function UpcomingBillsWidget() {
