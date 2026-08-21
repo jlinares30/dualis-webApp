@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Target, Plus, ChevronRight, Award, Plane, Home, Car, Laptop, ShieldCheck } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useGoals } from '@/hooks/useGoals';
+import { useGoals } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function GoalsWidget() {

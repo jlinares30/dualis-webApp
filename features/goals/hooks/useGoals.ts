@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getGoals, createGoal, depositToGoal, deleteGoal } from '@/lib/services/goals-service';
-import { CreateGoalRequest } from '@/types/goals';
+import { getGoals, createGoal, depositToGoal, deleteGoal } from '@/lib/services';
+import { CreateGoalRequest } from '@/types';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 

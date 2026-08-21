@@ -1,5 +1,5 @@
-import { apiFetch } from '../api';
-import { SavingsGoalDTO, CreateGoalRequest } from '@/types/goals';
+import { apiFetch } from '@/lib/api';
+import { SavingsGoalDTO, CreateGoalRequest } from '@/types';
 
 export async function getGoals(workspaceId?: string): Promise<SavingsGoalDTO[]> {
   if (!workspaceId) return [];

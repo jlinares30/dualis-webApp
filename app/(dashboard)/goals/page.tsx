@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { Target, Plus, ShieldCheck, Plane, Home, Car, Laptop, Trash2, ArrowUpRight, CheckCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useGoals, useCreateGoal, useDepositGoal, useDeleteGoal } from '@/hooks/useGoals';
+import { useGoals, useCreateGoal, useDepositGoal, useDeleteGoal } from '@/features/goals';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export default function GoalsPage() {
