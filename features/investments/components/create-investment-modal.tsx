@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { X, TrendingUp, Landmark, ShieldCheck } from 'lucide-react';
-import { useCreateInvestment } from '@/hooks/useInvestments';
+import { useCreateInvestment } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 interface CreateInvestmentModalProps {

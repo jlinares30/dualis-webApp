@@ -5,7 +5,7 @@ import {
   deleteInvestment, 
   CreateInvestmentRequest, 
   InvestmentDTO 
-} from '@/lib/services/investments-service';
+} from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 

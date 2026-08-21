@@ -13,8 +13,7 @@ import {
   Coins 
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useInvestments } from '@/hooks/useInvestments';
-import { CreateInvestmentModal } from '@/components/modals/create-investment-modal';
+import { useInvestments, CreateInvestmentModal } from '@/features/investments';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export default function InvestmentsPage() {

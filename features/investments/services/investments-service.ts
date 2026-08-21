@@ -1,29 +1,8 @@
-import { apiFetch } from '../api';
-import { getAccounts, createAccount, deleteAccount } from './accounts-service';
+import { apiFetch } from '@/lib/api';
+import { getAccounts, createAccount, deleteAccount } from '@/features/accounts/services/accounts-service';
+import { InvestmentDTO, CreateInvestmentRequest, InvestmentType } from '../types/investments';
 
-export interface InvestmentDTO {
-  id: string;
-  name: string;
-  type: 'STOCKS' | 'CRYPTO' | 'FIXED_TERM' | 'REAL_ESTATE' | 'CROWDLENDING' | 'MUTUAL_FUNDS';
-  institution: string;
-  initialCapital: number;
-  currentValue: number;
-  returnsAmount: number;
-  returnsPercentage: number;
-  currency: string;
-  workspaceId?: string;
-  createdAt?: string;
-}
-
-export interface CreateInvestmentRequest {
-  name: string;
-  type: string;
-  institution: string;
-  initialCapital: number;
-  currentValue?: number;
-  currency?: string;
-  workspaceId?: string;
-}
+export type { InvestmentDTO, CreateInvestmentRequest, InvestmentType };
 
 export async function getInvestments(workspaceId?: string): Promise<InvestmentDTO[]> {
   if (!workspaceId) return [];
