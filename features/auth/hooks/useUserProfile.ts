@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getUserProfile, updateUserProfile, UpdateProfileRequest } from '@/lib/services/users-service';
+import { getUserProfile, updateUserProfile, UpdateProfileRequest } from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 
 export function useUserProfile() {

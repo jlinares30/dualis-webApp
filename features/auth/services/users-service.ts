@@ -1,13 +1,7 @@
-import { apiFetch } from '../api';
-import { UserProfile } from '../auth';
+import { apiFetch } from '@/lib/api';
+import { UserProfile, UpdateProfileRequest } from '../types/auth';
 
-export interface UpdateProfileRequest {
-  fullName?: string;
-  firstName?: string;
-  lastName?: string;
-  preferredCurrency?: string;
-  baseCurrency?: string;
-}
+export type { UpdateProfileRequest };
 
 export async function getUserProfile(): Promise<UserProfile> {
   return apiFetch<UserProfile>('/auth/me');
