@@ -3,15 +3,15 @@ import { getBudgets, createBudget, deleteBudget, CreateBudgetRequest } from '@/l
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
-export function useBudgets() {
+export function useBudgets(month?: number, year?: number) {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
 
   return useQuery({
-    queryKey: ['budgets', activeWorkspaceId],
-    queryFn: () => getBudgets(activeWorkspaceId!),
+    queryKey: ['budgets', activeWorkspaceId, month, year],
+    queryFn: () => getBudgets(activeWorkspaceId!, month, year),
     enabled: isAuthenticated && Boolean(isValidUuid),
   });
 

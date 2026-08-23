@@ -3,9 +3,13 @@ import { BudgetDTO, CreateBudgetRequest } from '../types/budgets';
 
 export type { BudgetDTO, CreateBudgetRequest };
 
-export async function getBudgets(workspaceId?: string): Promise<BudgetDTO[]> {
+export async function getBudgets(workspaceId?: string, month?: number, year?: number): Promise<BudgetDTO[]> {
   if (!workspaceId) return [];
-  const budgets = await apiFetch<any[]>(`/budgets?workspaceId=${encodeURIComponent(workspaceId)}`);
+  const params = new URLSearchParams({ workspaceId });
+  if (month !== undefined) params.append('month', month.toString());
+  if (year !== undefined) params.append('year', year.toString());
+
+  const budgets = await apiFetch<any[]>(`/budgets?${params.toString()}`);
 
   const budgetsWithProgress = await Promise.all(
     budgets.map(async (b) => {

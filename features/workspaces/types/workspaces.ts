@@ -15,10 +15,11 @@ export interface WorkspaceDTO {
 
 export interface WorkspaceMemberDTO {
   id: string;
-  userId: string;
   userEmail: string;
-  userName: string;
   role: 'OWNER' | 'PARTNER' | 'MEMBER';
+  joinedAt?: string;
+  userName?: string;
+  userId?: string;
 }
 
 export interface Workspace {
