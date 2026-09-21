@@ -209,7 +209,16 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
                 {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
               </div>
               <div className="hidden lg:block text-left">
-                <span className="block text-xs font-semibold text-gray-200">{user.fullName || user.email}</span>
+                <span className="block text-xs font-semibold text-gray-200">
+                  {(() => {
+                    const rawName = user.fullName || user.email || '';
+                    const parts = rawName.trim().split(/\s+/);
+                    if (parts.length === 2 && parts[0].toLowerCase() === parts[1].toLowerCase()) {
+                      return parts[0];
+                    }
+                    return rawName;
+                  })()}
+                </span>
                 <span className="block text-[10px] text-emerald-400 flex items-center gap-1">
                   <ShieldCheck className="w-3 h-3" /> Conectado a API
                 </span>

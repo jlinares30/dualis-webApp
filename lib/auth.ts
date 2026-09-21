@@ -37,6 +37,15 @@ export interface AuthResponse {
   id: string;
 }
 
+function formatFullName(firstName?: string, lastName?: string, fallback?: string): string {
+  const f = (firstName || '').trim();
+  const l = (lastName || '').trim();
+  if (f && l && f.toLowerCase() === l.toLowerCase()) {
+    return f;
+  }
+  return `${f} ${l}`.trim() || fallback || '';
+}
+
 export async function loginUser(data: LoginRequest): Promise<AuthResponse> {
   const payload: LoginRequest = {
     email: data.email,
@@ -51,7 +60,7 @@ export async function loginUser(data: LoginRequest): Promise<AuthResponse> {
   const authResponse: AuthResponse = {
     token: response.accessToken,
     email: response.email,
-    name: `${response.firstName || ''} ${response.lastName || ''}`.trim() || response.email,
+    name: formatFullName(response.firstName, response.lastName, response.email),
     id: response.userId,
   };
 
@@ -65,14 +74,13 @@ export async function loginUser(data: LoginRequest): Promise<AuthResponse> {
 export async function registerUser(data: { email: string; password: string; fullName: string; baseCurrency?: string }): Promise<AuthResponse> {
   const parts = data.fullName.trim().split(' ');
   const firstName = parts[0] || 'Usuario';
-  const lastName = parts.slice(1).join(' ') || firstName;
+  const lastName = parts.slice(1).join(' ');
 
   const payload: RegisterRequest = {
     email: data.email,
     password: data.password,
     firstName,
-    lastName,
-    baseCurrency: data.baseCurrency || 'PEN',
+    lastName: lastName || '',
   };
 
   const response = await apiFetch<BackendAuthResponse>('/auth/register', {
@@ -83,7 +91,7 @@ export async function registerUser(data: { email: string; password: string; full
   const authResponse: AuthResponse = {
     token: response.accessToken,
     email: response.email,
-    name: `${response.firstName || ''} ${response.lastName || ''}`.trim() || response.email,
+    name: formatFullName(response.firstName, response.lastName, response.email),
     id: response.userId,
   };
 
@@ -91,12 +99,17 @@ export async function registerUser(data: { email: string; password: string; full
     localStorage.setItem('dualis_auth_token', authResponse.token);
   }
 
-
   return authResponse;
 }
 
 export async function getMe(): Promise<UserProfile> {
-  return apiFetch<UserProfile>('/auth/me');
+  const data = await apiFetch<any>('/auth/me');
+  return {
+    id: data.id,
+    email: data.email,
+    fullName: formatFullName(data.firstName, data.lastName, data.email),
+    preferredCurrency: data.baseCurrency || data.preferredCurrency || 'PEN',
+  };
 }
 
 export function logout(): void {
