@@ -13,7 +13,6 @@ import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function useWorkspaces() {
-
   const { isAuthenticated, user } = useAuthStore();
   const setWorkspaces = useWorkspaceStore((state) => state.setWorkspaces);
 
@@ -29,7 +28,7 @@ export function useWorkspaces() {
             name: 'Espacio Personal',
             description: 'Espacio de finanzas personales',
             type: 'INDIVIDUAL',
-            currency: 'PEN',
+            currency: user.preferredCurrency || 'PEN',
             ownerEmail: user.email,
           });
           data = [defaultWorkspace];
@@ -42,6 +41,8 @@ export function useWorkspaces() {
       return data;
     },
     enabled: isAuthenticated && Boolean(user?.email),
+    refetchInterval: 4000,
+    refetchIntervalInBackground: false,
   });
 }
 
