@@ -5,6 +5,7 @@ import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function useAccounts() {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const hasPartner = useWorkspaceStore((state) => state.hasPartner);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
@@ -13,8 +14,9 @@ export function useAccounts() {
     queryKey: ['accounts', activeWorkspaceId],
     queryFn: () => getAccounts(activeWorkspaceId!),
     enabled: isAuthenticated && Boolean(isValidUuid),
+    refetchInterval: hasPartner ? 5000 : false,
+    refetchIntervalInBackground: false,
   });
-
 }
 
 export function useCreateAccount() {

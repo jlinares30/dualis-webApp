@@ -1,20 +1,29 @@
 'use client';
 
 import React, { useState } from 'react';
-import { 
-  Wallet, 
-  CreditCard, 
-  Landmark, 
-  Plus, 
+import {
+  Wallet,
+  CreditCard,
+  Landmark,
+  Plus,
   TrendingUp,
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { WorkspaceType } from '@/types';
 import { useAccounts, CreateAccountModal, AccountItem, AccountCategory } from '@/features/accounts';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+import { useAuthStore } from '@/lib/stores/useAuthStore';
+import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 
 export default function AccountsPage({ workspace = 'personal' }: { workspace?: WorkspaceType }) {
   const { data: apiAccounts, isLoading } = useAccounts();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const { user } = useAuthStore();
+  const { convert } = useExchangeRateStore();
+
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const baseCurrency = (activeWs?.currency || user?.preferredCurrency || 'PEN').toUpperCase();
 
   const getAccountColor = (type: string) => {
     switch (type.toLowerCase()) {
@@ -46,18 +55,49 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
 
   const accounts: AccountItem[] = apiAccounts
     ? apiAccounts.map((a) => ({
-        id: a.id,
-        name: a.name,
-        type: getAccountCategory(a.type || 'bank'),
-        balance: a.balance,
-        currency: a.currency || 'PEN',
-        accountNumber: a.accountNumber,
-        color: a.color || getAccountColor(a.type || 'bank'),
-        workspace: (workspace as 'personal' | 'couple') || 'personal',
-      }))
+      id: a.id,
+      name: a.name,
+      type: getAccountCategory(a.type || 'bank'),
+      balance: a.balance,
+      currency: (a.currency && a.currency.trim() ? a.currency : baseCurrency).toUpperCase(),
+      accountNumber: a.accountNumber,
+      color: a.color || getAccountColor(a.type || 'bank'),
+      workspace: (workspace as 'personal' | 'couple') || 'personal',
+    }))
     : [];
 
-  const totalBalance = accounts.reduce((acc, curr) => acc + curr.balance, 0);
+  // Total convertido a la moneda del espacio
+  const convertedTotalBalance = accounts.reduce((acc, curr) => {
+    if (curr.currency === baseCurrency) return acc + curr.balance;
+    return acc + convert(curr.balance, curr.currency, baseCurrency);
+  }, 0);
+
+  const convertedDebitBalance = accounts
+    .filter((a) => a.balance > 0)
+    .reduce((acc, curr) => {
+      if (curr.currency === baseCurrency) return acc + curr.balance;
+      return acc + convert(curr.balance, curr.currency, baseCurrency);
+    }, 0);
+
+  const convertedCreditBalance = accounts
+    .filter((a) => a.balance < 0)
+    .reduce((acc, curr) => {
+      const positiveAmt = Math.abs(curr.balance);
+      if (curr.currency === baseCurrency) return acc + positiveAmt;
+      return acc + convert(positiveAmt, curr.currency, baseCurrency);
+    }, 0);
+
+  // Desglose por moneda
+  const currencyBreakdown = React.useMemo(() => {
+    const map: { [curr: string]: number } = {};
+    accounts.forEach((acc) => {
+      map[acc.currency] = (map[acc.currency] || 0) + acc.balance;
+    });
+    return Object.entries(map).map(([curr, amount]) => ({
+      currency: curr,
+      amount,
+    }));
+  }, [accounts]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -73,11 +113,11 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
             Gestión de Cuentas
           </h1>
           <p className="text-xs md:text-sm text-gray-400">
-            Administra tus fuentes de dinero, bancos y tarjetas de crédito.
+            Administra tus fuentes de dinero, bancos y tarjetas en cualquier divisa.
           </p>
         </div>
 
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
         >
@@ -86,17 +126,17 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
       </div>
 
       {/* Overview Card */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900/40 via-gray-900 to-emerald-950/30 border border-indigo-500/20 p-6 shadow-xl">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900/40 via-gray-900 to-emerald-950/30 border border-indigo-500/20 p-6 shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-              Patrimonio en Cuentas
+              Patrimonio Consolidado ({baseCurrency})
             </span>
             <h2 className="text-3xl md:text-4xl font-extrabold text-white mt-1">
-              {formatCurrency(totalBalance, 'PEN')}
+              {formatCurrency(convertedTotalBalance, baseCurrency)}
             </h2>
             <p className="text-xs text-emerald-400 font-medium mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5" /> Saldo total disponible entre {accounts.length} cuentas activas
+              <TrendingUp className="w-3.5 h-3.5" /> Saldo unificado entre {accounts.length} cuentas activas
             </p>
           </div>
 
@@ -104,17 +144,46 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
             <div className="px-4 py-2 rounded-2xl bg-gray-900/80 border border-gray-800 text-center">
               <span className="block text-[10px] text-gray-400 uppercase font-semibold">Cuentas Débito</span>
               <span className="text-sm font-bold text-emerald-400">
-                {formatCurrency(accounts.filter(a => a.balance > 0).reduce((acc, c) => acc + c.balance, 0), 'PEN')}
+                {formatCurrency(convertedDebitBalance, baseCurrency)}
               </span>
             </div>
             <div className="px-4 py-2 rounded-2xl bg-gray-900/80 border border-gray-800 text-center">
               <span className="block text-[10px] text-gray-400 uppercase font-semibold">Pasivos / Crédito</span>
               <span className="text-sm font-bold text-rose-400">
-                {formatCurrency(Math.abs(accounts.filter(a => a.balance < 0).reduce((acc, c) => acc + c.balance, 0)), 'PEN')}
+                {formatCurrency(convertedCreditBalance, baseCurrency)}
               </span>
             </div>
           </div>
         </div>
+
+        {/* Desglose multimoneda visual */}
+        {currencyBreakdown.length > 0 && (
+          <div className="pt-3 border-t border-gray-800/80">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-xs text-gray-400 font-semibold uppercase tracking-wider">
+                Desglose por divisa:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {currencyBreakdown.map((item) => (
+                  <div
+                    key={item.currency}
+                    className="px-3 py-1 rounded-xl bg-gray-950/70 border border-gray-800 flex items-center gap-2"
+                  >
+                    <span className="text-xs font-bold text-gray-300">{item.currency}:</span>
+                    <span className={`text-xs font-semibold ${item.amount < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      {formatCurrency(item.amount, item.currency)}
+                    </span>
+                    {item.currency !== baseCurrency && (
+                      <span className="text-[10px] text-gray-500">
+                        ≈ {formatCurrency(convert(item.amount, item.currency, baseCurrency), baseCurrency)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Grid of Accounts */}
@@ -179,9 +248,16 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
 
                 <div className="pt-3 border-t border-gray-800/80 flex items-baseline justify-between">
                   <span className="text-xs text-gray-400">Saldo actual</span>
-                  <span className={`font-bold text-lg ${isNegative ? 'text-rose-400' : 'text-emerald-400'}`}>
-                    {formatCurrency(acc.balance, acc.currency)}
-                  </span>
+                  <div className="text-right">
+                    <span className={`block font-bold text-lg ${isNegative ? 'text-rose-400' : 'text-emerald-400'}`}>
+                      {formatCurrency(acc.balance, acc.currency)}
+                    </span>
+                    {acc.currency !== baseCurrency && (
+                      <span className="block text-[11px] text-gray-400 font-medium">
+                        ≈ {formatCurrency(convert(acc.balance, acc.currency, baseCurrency), baseCurrency)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             );
