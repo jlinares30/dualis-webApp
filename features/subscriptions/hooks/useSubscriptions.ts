@@ -6,12 +6,15 @@ import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function useSubscriptions() {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const hasPartner = useWorkspaceStore((state) => state.hasPartner);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
     queryKey: ['subscriptions', activeWorkspaceId],
     queryFn: () => getSubscriptions(activeWorkspaceId!),
     enabled: isAuthenticated && Boolean(activeWorkspaceId),
+    refetchInterval: hasPartner ? 5000 : false,
+    refetchIntervalInBackground: false,
   });
 }
 
