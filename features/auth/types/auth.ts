@@ -1,4 +1,4 @@
-export interface BackendAuthResponse {
+﻿export interface BackendAuthResponse {
   accessToken: string;
   tokenType: string;
   userId: string;
@@ -6,6 +6,7 @@ export interface BackendAuthResponse {
   firstName: string;
   lastName: string;
   role?: string;
+  onboardingCompleted?: boolean;
 }
 
 export interface LoginRequest {
@@ -26,6 +27,7 @@ export interface UserProfile {
   email: string;
   fullName: string;
   preferredCurrency: string;
+  onboardingCompleted?: boolean;
 }
 
 export interface AuthResponse {
@@ -33,6 +35,7 @@ export interface AuthResponse {
   email: string;
   name: string;
   id: string;
+  onboardingCompleted?: boolean;
 }
 
 export interface UpdateProfileRequest {

@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { registerUser } from '@/lib/auth';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
-import { User, Lock, Mail, ShieldCheck, AlertCircle, ArrowRight, Wallet } from 'lucide-react';
+import { User, Lock, Mail, ShieldCheck, AlertCircle, ArrowRight } from 'lucide-react';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -15,12 +15,24 @@ export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (password !== confirmPassword) {
+      setError('Las contraseñas no coinciden.');
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -28,16 +40,16 @@ export default function RegisterPage() {
         email,
         password,
         fullName,
-        baseCurrency: 'PEN',
+        baseCurrency: 'USD',
       });
-
 
       if (response.token) {
         setAuth(response.token, {
           id: response.id,
           email: response.email,
           fullName: response.name || fullName,
-          preferredCurrency: 'PEN',
+          preferredCurrency: 'USD',
+          onboardingCompleted: false,
         });
       }
 
@@ -71,7 +83,7 @@ export default function RegisterPage() {
             <span className="text-2xl font-black tracking-tight text-white block">
               Dualis<span className="text-emerald-400">.</span>
             </span>
-            <span className="text-xs font-semibold text-indigo-400 uppercase tracking-widest block">
+            <span className="text-xs font-semibold text-emerald-400 uppercase tracking-widest block">
               Financial Suite
             </span>
           </div>
@@ -87,7 +99,7 @@ export default function RegisterPage() {
               Crear Cuenta
             </h1>
             <p className="text-xs text-gray-400 mt-1">
-              Únete a Dualis para sincronizar tus finanzas personales y en pareja.
+              Comienza a gestionar tus finanzas personales o en pareja hoy mismo.
             </p>
           </div>
 
@@ -100,8 +112,7 @@ export default function RegisterPage() {
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
-
+          <form onSubmit={handleSubmit} autoComplete="off" className="space-y-3.5">
             <div>
               <label className="block text-xs font-semibold text-gray-300 mb-1.5">
                 Nombre Completo
@@ -113,7 +124,7 @@ export default function RegisterPage() {
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Ej. John Wick"
+                  placeholder="Juan Pérez"
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gray-900/90 border border-gray-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm text-white placeholder-gray-500 outline-none transition-all"
                 />
               </div>
@@ -130,7 +141,7 @@ export default function RegisterPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="usuario@ejemplo.com"
+                  placeholder="juan@ejemplo.com"
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gray-900/90 border border-gray-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm text-white placeholder-gray-500 outline-none transition-all"
                 />
               </div>
@@ -147,7 +158,24 @@ export default function RegisterPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Mínimo 8 caracteres"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gray-900/90 border border-gray-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm text-white placeholder-gray-500 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                Confirmar Contraseña
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-3 w-4 h-4 text-gray-500" />
+                <input
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repite tu contraseña"
                   className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gray-900/90 border border-gray-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm text-white placeholder-gray-500 outline-none transition-all"
                 />
               </div>
@@ -162,7 +190,7 @@ export default function RegisterPage() {
                 <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <>
-                  Registrarse
+                  Crear Cuenta
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -172,13 +200,13 @@ export default function RegisterPage() {
           {/* Footer Navigation */}
           <div className="mt-6 text-center pt-4 border-t border-gray-800/60">
             <span className="text-xs text-gray-400">
-              ¿Ya tienes una cuenta registrada?{' '}
+              ¿Ya tienes una cuenta?{' '}
             </span>
             <Link
               href="/login"
               className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
             >
-              Inicia sesión aquí
+              Inicia sesión
             </Link>
           </div>
         </div>

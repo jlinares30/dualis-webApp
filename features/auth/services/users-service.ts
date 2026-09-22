@@ -19,6 +19,7 @@ export async function getUserProfile(): Promise<UserProfile> {
     email: data.email,
     fullName: formatFullName(data.firstName, data.lastName, data.email),
     preferredCurrency: data.baseCurrency || data.preferredCurrency || 'PEN',
+    onboardingCompleted: data.onboardingCompleted ?? false,
   };
 }
 
@@ -34,7 +35,7 @@ export async function updateUserProfile(data: UpdateProfileRequest): Promise<Use
     baseCurrency: baseCurrency,
   };
 
-  const response = await apiFetch<any>('/auth/me', {
+  const response = await apiFetch<any>('/auth/profile', {
     method: 'PUT',
     body: JSON.stringify(body),
   });
@@ -43,6 +44,7 @@ export async function updateUserProfile(data: UpdateProfileRequest): Promise<Use
     id: response.id,
     email: response.email,
     fullName: formatFullName(response.firstName, response.lastName, response.email),
-    preferredCurrency: response.baseCurrency || response.preferredCurrency || 'PEN',
+    preferredCurrency: response.baseCurrency || response.preferredCurrency || baseCurrency,
+    onboardingCompleted: response.onboardingCompleted ?? true,
   };
 }

@@ -8,6 +8,7 @@ export interface BackendAuthResponse {
   firstName: string;
   lastName: string;
   role?: string;
+  onboardingCompleted?: boolean;
 }
 
 export interface LoginRequest {
@@ -28,6 +29,7 @@ export interface UserProfile {
   email: string;
   fullName: string;
   preferredCurrency: string;
+  onboardingCompleted?: boolean;
 }
 
 export interface AuthResponse {
@@ -35,6 +37,16 @@ export interface AuthResponse {
   email: string;
   name: string;
   id: string;
+  onboardingCompleted?: boolean;
+}
+
+export interface OnboardingPayload {
+  baseCurrency: string;
+  accountName: string;
+  accountType: string;
+  initialBalance: number;
+  workspaceMode: 'INDIVIDUAL' | 'COUPLE';
+  partnerEmail?: string;
 }
 
 function formatFullName(firstName?: string, lastName?: string, fallback?: string): string {
@@ -62,6 +74,7 @@ export async function loginUser(data: LoginRequest): Promise<AuthResponse> {
     email: response.email,
     name: formatFullName(response.firstName, response.lastName, response.email),
     id: response.userId,
+    onboardingCompleted: response.onboardingCompleted ?? false,
   };
 
   if (authResponse.token && typeof window !== 'undefined') {
@@ -93,6 +106,7 @@ export async function registerUser(data: { email: string; password: string; full
     email: response.email,
     name: formatFullName(response.firstName, response.lastName, response.email),
     id: response.userId,
+    onboardingCompleted: response.onboardingCompleted ?? false,
   };
 
   if (authResponse.token && typeof window !== 'undefined') {
@@ -109,6 +123,21 @@ export async function getMe(): Promise<UserProfile> {
     email: data.email,
     fullName: formatFullName(data.firstName, data.lastName, data.email),
     preferredCurrency: data.baseCurrency || data.preferredCurrency || 'PEN',
+    onboardingCompleted: data.onboardingCompleted ?? false,
+  };
+}
+
+export async function submitOnboarding(payload: OnboardingPayload): Promise<UserProfile> {
+  const data = await apiFetch<any>('/auth/onboarding', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return {
+    id: data.id,
+    email: data.email,
+    fullName: formatFullName(data.firstName, data.lastName, data.email),
+    preferredCurrency: data.baseCurrency || data.preferredCurrency || 'PEN',
+    onboardingCompleted: data.onboardingCompleted ?? true,
   };
 }
 

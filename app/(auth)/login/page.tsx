@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { loginUser } from '@/lib/auth';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
-import { Sparkles, Lock, Mail, ShieldCheck, AlertCircle, ArrowRight, Wallet } from 'lucide-react';
+import { Lock, Mail, ShieldCheck, AlertCircle, ArrowRight } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,6 +34,7 @@ export default function LoginPage() {
           email: response.email || email,
           fullName: response.name || email.split('@')[0],
           preferredCurrency: 'PEN',
+          onboardingCompleted: response.onboardingCompleted ?? false,
         });
 
         router.replace('/');
@@ -46,7 +47,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#090d16] p-4 relative overflow-hidden">
@@ -100,7 +100,6 @@ export default function LoginPage() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} autoComplete="off" className="space-y-4">
-
             <div>
               <label className="block text-xs font-semibold text-gray-300 mb-1.5">
                 Correo Electrónico
