@@ -16,7 +16,7 @@ import {
   LogIn
 } from 'lucide-react';
 import { WorkspaceType } from '@/types';
-import { cn } from '@/lib/utils';
+import { cn, capitalize } from '@/lib/utils';
 import { getMe } from '@/lib/auth';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
@@ -43,6 +43,15 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
     }
   }, [user, setUser]);
 
+  const coupleWs = userWorkspaces.find((w) => w.type === 'COUPLE');
+  const partnerMember = coupleWs?.members?.find((m) => m.userEmail !== user?.email && m.userId !== user?.id);
+  const rawPartnerName =
+    partnerMember?.userName ||
+    (partnerMember?.userEmail ? partnerMember.userEmail.split('@')[0] : null) ||
+    (partnerName && partnerName.toLowerCase() !== 'pareja' && partnerName.toLowerCase() !== 'tu pareja' ? partnerName : null) ||
+    'tu pareja';
+  const displayPartnerName = capitalize(rawPartnerName);
+
   const workspaces = [
     {
       id: 'personal' as WorkspaceType,
@@ -54,7 +63,7 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
     {
       id: 'couple' as WorkspaceType,
       name: 'Espacio Pareja',
-      description: `Gastos compartidos con ${partnerName || 'tu pareja'}`,
+      description: `Gastos compartidos con ${displayPartnerName}`,
       icon: HeartHandshake,
       badgeColor: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     },

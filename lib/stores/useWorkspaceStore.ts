@@ -4,21 +4,41 @@ import { WorkspaceDTO } from '@/types';
 
 export type DefaultSplitRule = 'EQUALLY' | 'PROPORTIONAL_INCOME' | 'PERCENTAGE' | 'FIXED_AMOUNT';
 
+export interface ClosedWorkspaceSnapshot {
+  closedAt: string;
+  workspaceId: string;
+  partnerName: string;
+  partnerEmail?: string;
+  netBalance: number;
+  currency: string;
+  debtorEmail?: string | null;
+  creditorEmail?: string | null;
+  isUserDebtor: boolean;
+  isUserCreditor: boolean;
+  totalSharedExpenses?: number;
+  summaryText?: string;
+}
+
 interface WorkspaceState {
   activeWorkspaceId: string | null;
   activeWorkspaceType: 'INDIVIDUAL' | 'COUPLE' | 'personal' | 'couple';
   hasPartner: boolean;
   partnerName: string | null;
   partnerEmail: string | null;
+  lastClosedSnapshot: ClosedWorkspaceSnapshot | null;
   defaultSplitRule: DefaultSplitRule;
   defaultUserPercentage: number;
+  userMonthlyIncome?: number;
+  partnerMonthlyIncome?: number;
   workspaces: WorkspaceDTO[];
   setActiveWorkspace: (id: string, type?: 'INDIVIDUAL' | 'COUPLE' | 'personal' | 'couple') => void;
   switchWorkspaceType: (type: 'personal' | 'couple' | 'INDIVIDUAL' | 'COUPLE' | string) => void;
   setWorkspaces: (workspaces: WorkspaceDTO[]) => void;
   linkPartner: (name: string, email: string, defaultRule?: DefaultSplitRule) => void;
-  unlinkPartner: () => void;
+  unlinkPartner: (snapshot?: ClosedWorkspaceSnapshot) => void;
+  clearClosedSnapshot: () => void;
   setDefaultSplitRule: (rule: DefaultSplitRule, percentage?: number) => void;
+  setMonthlyIncomes: (userIncome: number, partnerIncome: number) => void;
   updateWorkspaceCurrency: (workspaceId: string, currency: string) => void;
 }
 
@@ -31,7 +51,9 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       partnerName: null,
       partnerEmail: null,
       defaultSplitRule: 'PROPORTIONAL_INCOME', // Por defecto en proporción a ingresos cuando se vinculen
-      defaultUserPercentage: 60,
+      defaultUserPercentage: 50,
+      userMonthlyIncome: 0,
+      partnerMonthlyIncome: 0,
       workspaces: [],
       setActiveWorkspace: (id: string, type?: 'INDIVIDUAL' | 'COUPLE' | 'personal' | 'couple') =>
         set((state: WorkspaceState) => ({
@@ -53,8 +75,25 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       setWorkspaces: (workspaces: WorkspaceDTO[]) =>
         set((state: WorkspaceState) => {
           const personalWs = workspaces.find((w) => w.type === 'INDIVIDUAL' || (w.type as any) === 'personal');
+          const coupleWs = workspaces.find((w) => w.type === 'COUPLE' || (w.type as any) === 'couple');
           
-          // Si no tiene pareja vinculada, forzamos SIEMPRE al workspace individual
+          // Si el servidor ya no devuelve ningún espacio de pareja (porque la pareja lo desvinculó o eliminó):
+          const serverHasCouple = Boolean(coupleWs);
+
+          // Si localmente creía tener pareja pero el servidor ya no tiene workspace de pareja:
+          if (!serverHasCouple) {
+            return {
+              workspaces,
+              hasPartner: false,
+              partnerName: null,
+              partnerEmail: null,
+              activeWorkspaceId: personalWs ? personalWs.id : (workspaces[0]?.id || null),
+              activeWorkspaceType: 'personal',
+            };
+          }
+
+          // Si el servidor SÍ tiene workspace de pareja:
+          // Si no tiene pareja vinculada en local, forzamos al workspace individual
           if (!state.hasPartner || state.activeWorkspaceType === 'personal') {
             return {
               workspaces,
@@ -88,7 +127,8 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             activeWorkspaceId: coupleWs ? coupleWs.id : state.activeWorkspaceId,
           };
         }),
-      unlinkPartner: () =>
+      lastClosedSnapshot: null,
+      unlinkPartner: (snapshot?: ClosedWorkspaceSnapshot) =>
         set((state: WorkspaceState) => {
           const personalWs = state.workspaces.find(
             (w) => w.type === 'INDIVIDUAL' || (w.type as any) === 'personal'
@@ -100,16 +140,31 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             hasPartner: false,
             partnerName: null,
             partnerEmail: null,
+            lastClosedSnapshot: snapshot || state.lastClosedSnapshot || null,
             activeWorkspaceType: 'personal',
             activeWorkspaceId: personalWs ? personalWs.id : (state.workspaces[0]?.id || null),
             workspaces: remainingWorkspaces.length > 0 ? remainingWorkspaces : state.workspaces,
           };
         }),
+      clearClosedSnapshot: () =>
+        set(() => ({
+          lastClosedSnapshot: null,
+        })),
       setDefaultSplitRule: (rule: DefaultSplitRule, percentage?: number) =>
         set((state: WorkspaceState) => ({
           defaultSplitRule: rule,
           defaultUserPercentage: percentage !== undefined ? percentage : state.defaultUserPercentage,
         })),
+      setMonthlyIncomes: (userIncome: number, partnerIncome: number) =>
+        set(() => {
+          const total = userIncome + partnerIncome;
+          const calculatedPct = total > 0 ? Math.round((userIncome / total) * 100) : 50;
+          return {
+            userMonthlyIncome: userIncome,
+            partnerMonthlyIncome: partnerIncome,
+            defaultUserPercentage: calculatedPct,
+          };
+        }),
     }),
     {
       name: 'dualis-workspace-storage',

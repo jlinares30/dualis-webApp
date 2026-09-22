@@ -7,8 +7,9 @@ import { Header } from '@/components/layout/header';
 import { WorkspaceType } from '@/types';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
-
-import { useWorkspaces } from '@/hooks';
+import { useWorkspaces, useAccounts } from '@/hooks';
+import { useUserProfile } from '@/features/auth/hooks/useUserProfile';
+import { OnboardingModal } from '@/features/onboarding';
 
 export default function DashboardLayout({
   children,
@@ -18,16 +19,45 @@ export default function DashboardLayout({
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [onboardingDismissed, setOnboardingDismissed] = useState(false);
 
   // Inicializar consulta de workspaces del usuario para que el store tenga un UUID de workspace válido
   useWorkspaces();
+  const { data: accountsList } = useAccounts();
+
+  // Consulta de perfil en segundo plano para sincronizar el estado real del usuario con el backend
+  const { data: remoteProfile } = useUserProfile();
 
   const { activeWorkspaceType, activeWorkspaceId, switchWorkspaceType, hasPartner, workspaces } = useWorkspaceStore();
-  const { isAuthenticated, token } = useAuthStore();
+  const { isAuthenticated, token, user, setUser } = useAuthStore();
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  // Si el perfil remoto llega y tiene campos actualizados, sincronizar con el store local
+  useEffect(() => {
+    if (remoteProfile && user) {
+      if (
+        remoteProfile.onboardingCompleted !== user.onboardingCompleted ||
+        remoteProfile.preferredCurrency !== user.preferredCurrency
+      ) {
+        setUser({
+          ...user,
+          onboardingCompleted: remoteProfile.onboardingCompleted,
+          preferredCurrency: remoteProfile.preferredCurrency,
+        });
+      }
+
+      // Si el workspace activo no tiene la misma moneda que el perfil del usuario, sincronizarlo
+      if (remoteProfile.preferredCurrency && activeWorkspaceId) {
+        const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+        if (activeWs && activeWs.currency !== remoteProfile.preferredCurrency) {
+          useWorkspaceStore.getState().updateWorkspaceCurrency(activeWorkspaceId, remoteProfile.preferredCurrency);
+        }
+      }
+    }
+  }, [remoteProfile, user, setUser, activeWorkspaceId, workspaces]);
 
   useEffect(() => {
     if (!hasPartner && workspaces.length > 0) {
@@ -61,6 +91,14 @@ export default function DashboardLayout({
     );
   }
 
+  // Detectar si el usuario requiere onboarding:
+  // Se abre si onboardingCompleted es falso (o no está completado) y no ha sido descartado en la sesión
+  const needsOnboarding = Boolean(
+    !onboardingDismissed &&
+    user &&
+    !user.onboardingCompleted
+  );
+
   return (
     <div className="min-h-screen flex bg-[#090d16] text-gray-100 antialiased">
       {/* Sidebar */}
@@ -83,6 +121,14 @@ export default function DashboardLayout({
             : children}
         </main>
       </div>
+
+      {/* Modal de Onboarding Inicial para nuevos usuarios */}
+      <OnboardingModal
+        isOpen={needsOnboarding}
+        onComplete={() => {
+          setOnboardingDismissed(true);
+        }}
+      />
     </div>
   );
 }

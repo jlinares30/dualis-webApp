@@ -17,10 +17,12 @@ import {
   Target,
   Calendar,
   X,
-  Menu
+  Menu,
+  User
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, capitalize } from '@/lib/utils';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+import { useAuthStore } from '@/lib/stores/useAuthStore';
 
 export interface NavItem {
   name: string;
@@ -34,7 +36,7 @@ export const navigationItems: NavItem[] = [
   { name: 'Transacciones', href: '/transactions', icon: Receipt },
   { name: 'Presupuestos', href: '/budgets', icon: PieChart },
   { name: 'Metas de Ahorro', href: '/goals', icon: Target },
-  { name: 'Pagos Fijos', href: '/subscriptions', icon: Calendar },
+  { name: 'Gastos Fijos', href: '/subscriptions', icon: Calendar },
   { name: 'Inversiones', href: '/investments', icon: TrendingUp },
   { name: 'Liquidación', href: '/settlements', icon: HeartHandshake },
   { name: 'Espacios', href: '/workspaces', icon: Users },
@@ -48,7 +50,21 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
   const pathname = usePathname();
-  const { hasPartner, partnerName } = useWorkspaceStore();
+  const { user } = useAuthStore();
+  const { hasPartner, partnerName, activeWorkspaceType, activeWorkspaceId, workspaces } = useWorkspaceStore();
+
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId) || workspaces.find((w) => w.type === 'COUPLE');
+  const isCoupleWorkspace = (activeWorkspaceType === 'couple' || activeWorkspaceType === 'COUPLE') || activeWs?.type === 'COUPLE';
+
+  // Obtener el nombre real de la pareja desde los miembros del workspace compartido si el store tiene 'pareja' genérico
+  const coupleWs = workspaces.find((w) => w.type === 'COUPLE');
+  const partnerMember = coupleWs?.members?.find((m) => m.userEmail !== user?.email && m.userId !== user?.id);
+  const rawPartnerName =
+    partnerMember?.userName ||
+    (partnerMember?.userEmail ? partnerMember.userEmail.split('@')[0] : null) ||
+    (partnerName && partnerName.toLowerCase() !== 'pareja' && partnerName.toLowerCase() !== 'tu pareja' ? partnerName : null) ||
+    'tu pareja';
+  const resolvedPartnerName = capitalize(rawPartnerName);
 
   // En Modo Personal (!hasPartner), ocultamos Liquidación y Espacios de la navegación lateral.
   const filteredNavItems = navigationItems.filter((item) => {
@@ -116,12 +132,33 @@ export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
         })}
       </nav>
 
-      {/* Personal Status Badge Footer */}
-      <div className="mt-auto p-3.5 rounded-xl bg-gray-900/60 border border-gray-800/60 text-center">
-        <span className="block text-xs font-bold text-gray-300">Espacio Personal</span>
-        <p className="text-[10px] text-gray-500 mt-0.5">
-          Gestión de finanzas individuales activa.
-        </p>
+      {/* Workspace Status Badge Footer */}
+      <div className="mt-auto p-3.5 rounded-xl bg-gray-900/60 border border-gray-800/60 transition-all">
+        {isCoupleWorkspace ? (
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 shrink-0">
+              <HeartHandshake className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <span className="block text-xs font-bold text-white truncate">Espacio en Pareja</span>
+              <p className="text-[10px] text-emerald-400/90 truncate font-medium">
+                Con {resolvedPartnerName}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 shrink-0">
+              <User className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <span className="block text-xs font-bold text-white truncate">Espacio Personal</span>
+              <p className="text-[10px] text-gray-400 truncate">
+                Tus finanzas individuales
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

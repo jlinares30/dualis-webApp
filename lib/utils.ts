@@ -57,3 +57,10 @@ export function filterTransactionsByPeriod<T extends { transactionDate?: string 
     return true;
   });
 }
+
+export function capitalize(str?: string | null): string {
+  if (!str) return '';
+  const trimmed = str.trim();
+  if (!trimmed) return '';
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+}
