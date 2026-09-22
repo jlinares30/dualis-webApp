@@ -3,6 +3,7 @@ import { Users, User } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { WorkspaceType, Transaction } from '@/types';
 import { useTransactions } from '@/hooks';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { getTransactionIconAndStyle } from '@/lib/transaction-icons';
 
 import { ExportButton } from '@/components/ui/export-button';
@@ -12,23 +13,31 @@ interface RecentTransactionsProps {
 }
 
 export function RecentTransactions({ workspace }: RecentTransactionsProps) {
+  const { hasPartner, activeWorkspaceType, workspaces } = useWorkspaceStore();
+  const currentWorkspace = workspace || (activeWorkspaceType === 'COUPLE' || activeWorkspaceType === 'couple' ? 'couple' : 'personal');
+  const isCoupleActive = hasPartner && (currentWorkspace === 'couple' || currentWorkspace === 'COUPLE');
+
   const { data: pageData, isLoading } = useTransactions(0, 5);
 
   const transactionsList = pageData?.content || [];
 
   const transactions: Transaction[] = pageData?.content
-    ? pageData.content.map((dto) => ({
-        id: dto.id,
-        title: dto.description || 'Sin concepto',
-        category: (dto.categoryName as any) || 'General',
-        categoryLabel: dto.categoryName || 'General',
-        amount: dto.amount,
-        currency: dto.currency || 'PEN',
-        date: dto.transactionDate ? new Date(dto.transactionDate).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }) : 'Hoy',
-        type: dto.type === 'INCOME' ? 'income' : 'expense',
-        workspace: 'personal',
-        paidBy: dto.paidByUserName,
-      }))
+    ? pageData.content.map((dto) => {
+        const txWs = workspaces.find((w) => w.id === dto.workspaceId);
+        const isTxCouple = txWs?.type === 'COUPLE' || (txWs?.type as any) === 'couple' || isCoupleActive;
+        return {
+          id: dto.id,
+          title: dto.description || 'Sin concepto',
+          category: (dto.categoryName as any) || 'General',
+          categoryLabel: dto.categoryName || 'General',
+          amount: dto.amount,
+          currency: dto.currency || 'PEN',
+          date: dto.transactionDate ? new Date(dto.transactionDate).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }) : 'Hoy',
+          type: dto.type === 'INCOME' ? 'income' : 'expense',
+          workspace: isTxCouple ? 'couple' : 'personal',
+          paidBy: dto.paidByUserName,
+        };
+      })
     : [];
 
   return (
@@ -69,9 +78,15 @@ export function RecentTransactions({ workspace }: RecentTransactionsProps) {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm text-gray-100">{tx.title}</span>
-                      <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-md">
-                        <User className="w-3 h-3" /> Personal
-                      </span>
+                      {hasPartner && tx.workspace === 'couple' ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
+                          <Users className="w-3 h-3" /> Compartido
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-md">
+                          <User className="w-3 h-3" /> Personal
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
                       <span>{tx.categoryLabel || tx.category}</span>

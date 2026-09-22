@@ -21,16 +21,30 @@ import { UpcomingBillsWidget } from '@/features/subscriptions';
 import { PartnerComparisonChart } from '@/features/settlements';
 import { WorkspaceType } from '@/types';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+import { useAuthStore } from '@/lib/stores/useAuthStore';
+import { capitalize } from '@/lib/utils';
 import { Sparkles } from 'lucide-react';
 
 interface DashboardPageProps {
   workspace?: WorkspaceType;
 }
 
-export default function DashboardPage({ workspace = 'personal' }: DashboardPageProps) {
-  const { hasPartner, partnerName } = useWorkspaceStore();
-  const isCouple = hasPartner && workspace === 'couple';
+export default function DashboardPage({ workspace }: DashboardPageProps) {
+  const { user } = useAuthStore();
+  const { hasPartner, partnerName, activeWorkspaceType, workspaces } = useWorkspaceStore();
+  const effectiveWorkspace = workspace || (activeWorkspaceType === 'COUPLE' || activeWorkspaceType === 'couple' ? 'couple' : 'personal');
+  const isCouple = hasPartner && effectiveWorkspace === 'couple';
   const [selectedPeriod, setSelectedPeriod] = useState<DateFilterOption>('THIS_MONTH');
+
+  // Obtener el nombre real de la pareja de los miembros del espacio compartido
+  const coupleWs = workspaces.find((w) => w.type === 'COUPLE');
+  const partnerMember = coupleWs?.members?.find((m) => m.userEmail !== user?.email && m.userId !== user?.id);
+  const rawPartnerName =
+    partnerMember?.userName ||
+    (partnerMember?.userEmail ? partnerMember.userEmail.split('@')[0] : null) ||
+    (partnerName && partnerName.toLowerCase() !== 'pareja' && partnerName.toLowerCase() !== 'tu pareja' ? partnerName : null) ||
+    'tu pareja';
+  const displayPartnerName = capitalize(rawPartnerName);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -42,7 +56,7 @@ export default function DashboardPage({ workspace = 'personal' }: DashboardPageP
               <Sparkles className="w-3 h-3" /> Dashboard Financiero Analytics
             </span>
             <span className="text-xs font-medium text-gray-400">
-              {isCouple ? `Espacio Compartido con ${partnerName || 'tu pareja'}` : 'Espacio Personal'}
+              {isCouple ? `Espacio Compartido con ${displayPartnerName}` : 'Espacio Personal'}
             </span>
           </div>
           <p className="text-xs md:text-sm text-gray-400">
@@ -54,12 +68,12 @@ export default function DashboardPage({ workspace = 'personal' }: DashboardPageP
 
         <div className="flex items-center gap-3">
           <DashboardDateFilter selectedPeriod={selectedPeriod} onPeriodChange={setSelectedPeriod} />
-          <QuickActions />
+          <QuickActions workspace={effectiveWorkspace} />
         </div>
       </div>
 
       {/* Financial Summary Metric Cards */}
-      <SummaryCards workspace={workspace} period={selectedPeriod} />
+      <SummaryCards workspace={effectiveWorkspace} period={selectedPeriod} />
 
       {/* Main Cash Flow Chart */}
       <CashFlowChart period={selectedPeriod} />
@@ -94,7 +108,7 @@ export default function DashboardPage({ workspace = 'personal' }: DashboardPageP
       </div>
 
       {/* Recent Transactions List */}
-      <RecentTransactions workspace={workspace} />
+      <RecentTransactions workspace={effectiveWorkspace} />
     </div>
   );
 }

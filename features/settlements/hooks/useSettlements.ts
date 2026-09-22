@@ -23,6 +23,8 @@ export function useDebtBalanceSummary() {
     queryFn: () => getDebtBalanceSummary(activeWorkspaceId!),
     enabled: isAuthenticated && Boolean(isValidUuid) && Boolean(isCoupleWorkspace),
     retry: false,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: false,
   });
 }
 

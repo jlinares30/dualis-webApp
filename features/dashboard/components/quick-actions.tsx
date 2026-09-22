@@ -5,15 +5,17 @@ import { PlusCircle, Split } from 'lucide-react';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { CreateTransactionModal } from '@/features/transactions/components/create-transaction-modal';
 
+import { WorkspaceType } from '@/types';
+
 interface QuickActionsProps {
-  workspace?: 'personal' | 'couple';
+  workspace?: WorkspaceType;
 }
 
 export function QuickActions({ workspace = 'personal' }: QuickActionsProps) {
   const { hasPartner } = useWorkspaceStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const isCouple = hasPartner && workspace === 'couple';
+  const isCouple = hasPartner && (workspace === 'couple' || workspace === 'COUPLE');
 
   return (
     <>
@@ -48,4 +50,3 @@ export function QuickActions({ workspace = 'personal' }: QuickActionsProps) {
     </>
   );
 }
-

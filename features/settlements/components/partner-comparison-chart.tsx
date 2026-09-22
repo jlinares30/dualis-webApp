@@ -11,7 +11,7 @@ import {
   CartesianGrid,
   Cell,
 } from 'recharts';
-import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
+import { formatCurrency, filterTransactionsByPeriod, capitalize } from '@/lib/utils';
 import { Users, HeartHandshake, ArrowRightLeft } from 'lucide-react';
 import { useTransactions } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
@@ -29,8 +29,15 @@ export function PartnerComparisonChart({ period }: PartnerComparisonChartProps) 
   const currency = activeWs?.currency || 'PEN';
   const { data: pageData, isLoading } = useTransactions(0, 200);
 
-  const myName = user?.fullName?.split(' ')[0] || 'Tú';
-  const partnerLabel = partnerName || 'Tu Pareja';
+  const myName = capitalize(user?.fullName?.split(' ')[0]) || 'Tú';
+  const coupleWs = workspaces.find((w) => w.type === 'COUPLE');
+  const partnerMember = coupleWs?.members?.find((m) => m.userEmail !== user?.email && m.userId !== user?.id);
+  const rawPartnerName =
+    partnerMember?.userName ||
+    (partnerMember?.userEmail ? partnerMember.userEmail.split('@')[0] : null) ||
+    (partnerName && partnerName.toLowerCase() !== 'pareja' && partnerName.toLowerCase() !== 'tu pareja' ? partnerName : null) ||
+    'Tu Pareja';
+  const partnerLabel = capitalize(rawPartnerName);
 
   const { chartData, myTotal, partnerTotal, settlementText } = React.useMemo(() => {
     if (!pageData?.content || pageData.content.length === 0) {
