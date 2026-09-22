@@ -6,6 +6,7 @@ import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function useTransactions(page = 0, size = 10) {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const hasPartner = useWorkspaceStore((state) => state.hasPartner);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
@@ -14,8 +15,9 @@ export function useTransactions(page = 0, size = 10) {
     queryKey: ['transactions', activeWorkspaceId, page, size],
     queryFn: () => getTransactions({ workspaceId: activeWorkspaceId!, page, size }),
     enabled: isAuthenticated && Boolean(isValidUuid),
+    refetchInterval: hasPartner ? 5000 : false,
+    refetchIntervalInBackground: false,
   });
-
 }
 
 export function useCreateTransaction() {

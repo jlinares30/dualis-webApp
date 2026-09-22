@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Receipt, Split, Sparkles, Wallet, PieChart, Percent, DollarSign } from 'lucide-react';
 import { useWorkspaceStore, DefaultSplitRule } from '@/lib/stores/useWorkspaceStore';
-import { useCreateTransaction } from '@/hooks';
+import { useAuthStore } from '@/lib/stores/useAuthStore';
+import { useCreateTransaction, useTransactions, useSplitRules } from '@/hooks';
 import { useAccounts, useCreateAccount } from '@/hooks';
 import { useCategories, useCreateCategory } from '@/hooks';
 
@@ -14,7 +15,14 @@ interface CreateTransactionModalProps {
 export type SplitMode = 'EQUALLY' | 'PERCENTAGE' | 'PROPORTIONAL_INCOME' | 'FIXED_AMOUNT';
 
 export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense' }: CreateTransactionModalProps) {
-  const { hasPartner, partnerName, defaultSplitRule, defaultUserPercentage } = useWorkspaceStore();
+  const hasPartner = useWorkspaceStore((state) => state.hasPartner);
+  const partnerName = useWorkspaceStore((state) => state.partnerName);
+  const defaultSplitRule = useWorkspaceStore((state) => state.defaultSplitRule);
+  const defaultUserPercentage = useWorkspaceStore((state) => state.defaultUserPercentage);
+  const userMonthlyIncome = useWorkspaceStore((state) => state.userMonthlyIncome || 0);
+  const partnerMonthlyIncome = useWorkspaceStore((state) => state.partnerMonthlyIncome || 0);
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const { user } = useAuthStore();
 
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
@@ -22,18 +30,27 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
 
-  // Split options initialized with default rules
   const [isSplit, setIsSplit] = useState(hasPartner);
   const [splitMode, setSplitMode] = useState<DefaultSplitRule>(defaultSplitRule);
   const [userPercentage, setUserPercentage] = useState(defaultUserPercentage);
   const [fixedPartnerAmount, setFixedPartnerAmount] = useState('');
+
+  // Sincronizar reglas y porcentajes cada vez que se abre el modal o cambian en el store
+  useEffect(() => {
+    if (isOpen) {
+      setIsSplit(hasPartner);
+      setSplitMode(defaultSplitRule);
+      setUserPercentage(defaultUserPercentage);
+    }
+  }, [isOpen, hasPartner, defaultSplitRule, defaultUserPercentage, userMonthlyIncome, partnerMonthlyIncome]);
 
   const { mutateAsync: createTx, isPending } = useCreateTransaction();
   const { data: accountsData } = useAccounts();
   const { mutateAsync: createAccount } = useCreateAccount();
   const { data: categoriesData } = useCategories(type === 'income' ? 'INCOME' : 'EXPENSE');
   const { mutateAsync: createCategory } = useCreateCategory();
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const { data: txPage } = useTransactions(0, 100);
+  const { data: splitRules = [] } = useSplitRules();
 
   useEffect(() => {
     if (accountsData && accountsData.length > 0 && !selectedAccountId) {
@@ -129,10 +146,46 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
     }
 
     if (splitMode === 'PROPORTIONAL_INCOME') {
-      // Ejemplo: Jorge gana S/ 3800, Sofía gana S/ 2500 -> Total 6300 (60.3% / 39.7%)
-      const myShare = (parsedAmount * 60.3) / 100;
+      let myInc = userMonthlyIncome;
+      let partnerInc = partnerMonthlyIncome;
+
+      // Si el store local aún no los tiene (ej. en la ventana de la pareja), obtener de la regla guardada en la base de datos
+      if (myInc <= 0 && partnerInc <= 0 && splitRules.length > 0) {
+        const defaultRule = splitRules.find((r) => r.isDefault || r.splitType === 'PROPORTIONAL') || splitRules[0];
+        if (defaultRule && ((defaultRule.partnerAIncome ?? 0) > 0 || (defaultRule.partnerBIncome ?? 0) > 0)) {
+          myInc = defaultRule.partnerAIncome ?? 0;
+          partnerInc = defaultRule.partnerBIncome ?? 0;
+        }
+      }
+
+      // Si aún no están configurados los sueldos fijos, calcular a partir de las transacciones de ingreso
+      if (myInc <= 0 && partnerInc <= 0 && txPage?.content) {
+        const myName = user?.fullName?.split(' ')[0] || 'Tú';
+        txPage.content.forEach((tx) => {
+          if (tx.type === 'INCOME') {
+            if (!tx.paidByUserId || tx.paidByUserId === user?.email || tx.paidByUserName?.includes(myName)) {
+              myInc += tx.amount;
+            } else {
+              partnerInc += tx.amount;
+            }
+          }
+        });
+      }
+
+      const totalIncome = myInc + partnerInc;
+      let myPct = 50;
+      let partnerPct = 50;
+      let labelDetail = 'Equitativo 50/50 (Sin ingresos registrados aún)';
+
+      if (totalIncome > 0) {
+        myPct = parseFloat(((myInc / totalIncome) * 100).toFixed(1));
+        partnerPct = parseFloat((100 - myPct).toFixed(1));
+        labelDetail = `Basado en Ingresos (${myInc} vs ${partnerInc}): ${myPct}% / ${partnerPct}%`;
+      }
+
+      const myShare = (parsedAmount * myPct) / 100;
       const partnerShare = parsedAmount - myShare;
-      return `Tú: S/ ${myShare.toFixed(2)} (60.3%) | ${targetName}: S/ ${partnerShare.toFixed(2)} (39.7%) [Basado en Ingresos]`;
+      return `Tú: S/ ${myShare.toFixed(2)} (${myPct}%) | ${targetName}: S/ ${partnerShare.toFixed(2)} (${partnerPct}%) [${labelDetail}]`;
     }
 
     if (splitMode === 'FIXED_AMOUNT') {

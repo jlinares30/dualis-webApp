@@ -15,8 +15,11 @@ import { useTransactions, CreateTransactionModal, Transaction } from '@/features
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { getTransactionIconAndStyle } from '@/lib/transaction-icons';
 
-export default function TransactionsPage({ workspace = 'personal' }: { workspace?: WorkspaceType }) {
-  const { hasPartner } = useWorkspaceStore();
+export default function TransactionsPage({ workspace }: { workspace?: WorkspaceType }) {
+  const { hasPartner, activeWorkspaceType, activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const currentWorkspace = workspace || (activeWorkspaceType === 'COUPLE' || activeWorkspaceType === 'couple' ? 'couple' : 'personal');
+  const isCoupleActive = hasPartner && currentWorkspace === 'couple';
+
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState<'all' | 'income' | 'expense'>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -26,26 +29,28 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
   const { data: pageData, isLoading } = useTransactions(currentPage, pageSize);
 
   const allTransactions: Transaction[] = pageData?.content
-    ? pageData.content.map((dto) => ({
-        id: dto.id,
-        title: dto.description || 'Sin concepto',
-        category: (dto.categoryName as any) || 'General',
-        categoryLabel: dto.categoryName || 'General',
-        amount: dto.amount,
-        currency: dto.currency || 'PEN',
-        date: dto.transactionDate ? new Date(dto.transactionDate).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Hoy',
-        type: dto.type === 'INCOME' ? 'income' : 'expense',
-        workspace: 'personal',
-        paidBy: dto.paidByUserName,
-      }))
+    ? pageData.content.map((dto) => {
+        const txWs = workspaces.find((w) => w.id === dto.workspaceId);
+        const isTxCouple = txWs?.type === 'COUPLE' || (txWs?.type as any) === 'couple' || isCoupleActive;
+        return {
+          id: dto.id,
+          title: dto.description || 'Sin concepto',
+          category: (dto.categoryName as any) || 'General',
+          categoryLabel: dto.categoryName || 'General',
+          amount: dto.amount,
+          currency: dto.currency || 'PEN',
+          date: dto.transactionDate ? new Date(dto.transactionDate).toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Hoy',
+          type: dto.type === 'INCOME' ? 'income' : 'expense',
+          workspace: isTxCouple ? 'couple' : 'personal',
+          paidBy: dto.paidByUserName,
+        };
+      })
     : [];
 
   const filtered = allTransactions.filter((tx) => {
-    const isCoupleWorkspace = hasPartner && workspace === 'couple';
-    const matchesWorkspace = isCoupleWorkspace ? tx.workspace === 'couple' : true;
     const matchesSearch = tx.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = selectedType === 'all' || tx.type === selectedType;
-    return matchesWorkspace && matchesSearch && matchesType;
+    return matchesSearch && matchesType;
   });
 
   const totalPages = pageData?.totalPages || 1;
@@ -172,7 +177,7 @@ export default function TransactionsPage({ workspace = 'personal' }: { workspace
                         <span className="font-bold text-sm text-white">{tx.title}</span>
                         {hasPartner && tx.workspace === 'couple' ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
-                            <Users className="w-3 h-3" /> Shared {tx.splitRatio}
+                            <Users className="w-3 h-3" /> Compartido Pareja
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-md">

@@ -11,6 +11,7 @@ import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export function useSplitRules() {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const hasPartner = useWorkspaceStore((state) => state.hasPartner);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
@@ -19,6 +20,9 @@ export function useSplitRules() {
     queryKey: ['splitRules', activeWorkspaceId],
     queryFn: () => getSplitRulesByWorkspace(activeWorkspaceId!),
     enabled: isAuthenticated && Boolean(isValidUuid),
+    // Near Real-Time: sondea cambios en segundo plano cada 4s si es workspace de pareja
+    refetchInterval: hasPartner ? 4000 : false,
+    refetchIntervalInBackground: false, // Pausa si la pestaña no está activa para ahorrar recursos
   });
 }
 
