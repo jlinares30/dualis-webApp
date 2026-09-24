@@ -3,8 +3,9 @@ import { getAccounts, createAccount, updateAccount, deleteAccount, CreateAccount
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
-export function useAccounts() {
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+export function useAccounts(customWorkspaceId?: string) {
+  const storeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const activeWorkspaceId = customWorkspaceId || storeWorkspaceId;
   const hasPartner = useWorkspaceStore((state) => state.hasPartner);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 

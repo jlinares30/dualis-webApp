@@ -6,6 +6,7 @@ export interface AccountDTO {
   type: string;
   balance: number;
   currency: string;
+  status?: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
   accountNumber?: string;
   description?: string;
   color?: string;

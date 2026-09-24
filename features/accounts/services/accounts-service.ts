@@ -3,8 +3,15 @@ import { AccountDTO, CreateAccountRequest } from '../types/accounts';
 
 export type { AccountDTO, CreateAccountRequest };
 
-export async function getAccounts(workspaceId: string): Promise<AccountDTO[]> {
-  return apiFetch<AccountDTO[]>(`/accounts?workspaceId=${encodeURIComponent(workspaceId)}`);
+export async function getAccounts(workspaceId: string, status?: string): Promise<AccountDTO[]> {
+  const query = new URLSearchParams({ workspaceId });
+  if (status !== undefined) {
+    if (status) query.append('status', status);
+  } else {
+    // Por defecto consultar solo cuentas activas
+    query.append('status', 'ACTIVE');
+  }
+  return apiFetch<AccountDTO[]>(`/accounts?${query.toString()}`);
 }
 
 export async function createAccount(data: CreateAccountRequest): Promise<AccountDTO> {

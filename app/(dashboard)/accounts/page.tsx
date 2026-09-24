@@ -7,18 +7,33 @@ import {
   Landmark,
   Plus,
   TrendingUp,
+  MoreVertical,
+  Pencil,
+  Trash2,
+  AlertTriangle,
+  ArrowRightLeft,
+  X
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { WorkspaceType } from '@/types';
-import { useAccounts, CreateAccountModal, AccountItem, AccountCategory } from '@/features/accounts';
+import { useAccounts, useDeleteAccount, useUpdateAccount, CreateAccountModal, EditAccountModal, AccountItem, AccountCategory } from '@/features/accounts';
+import { useCreateTransaction } from '@/features/transactions';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 
 export default function AccountsPage({ workspace = 'personal' }: { workspace?: WorkspaceType }) {
   const { data: apiAccounts, isLoading } = useAccounts();
+  const { mutateAsync: deleteAccountMut, isPending: isDeletingAccount } = useDeleteAccount();
+  const { mutateAsync: createTransactionMut, isPending: isCreatingTransfer } = useCreateTransaction();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const { activeWorkspaceId, workspaces } = useWorkspaceStore();
+  const [editingAccount, setEditingAccount] = useState<AccountItem | null>(null);
+  const [accountToDelete, setAccountToDelete] = useState<AccountItem | null>(null);
+  const [targetTransferAccountId, setTargetTransferAccountId] = useState<string>('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeletingLoading, setIsDeletingLoading] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const { activeWorkspaceId, activeWorkspaceType, workspaces } = useWorkspaceStore();
   const { user } = useAuthStore();
   const { convert } = useExchangeRateStore();
 
@@ -54,16 +69,18 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
   };
 
   const accounts: AccountItem[] = apiAccounts
-    ? apiAccounts.map((a) => ({
-      id: a.id,
-      name: a.name,
-      type: getAccountCategory(a.type || 'bank'),
-      balance: a.balance,
-      currency: (a.currency && a.currency.trim() ? a.currency : baseCurrency).toUpperCase(),
-      accountNumber: a.accountNumber,
-      color: a.color || getAccountColor(a.type || 'bank'),
-      workspace: (workspace as 'personal' | 'couple') || 'personal',
-    }))
+    ? apiAccounts
+        .filter((a) => a.status !== 'ARCHIVED')
+        .map((a) => ({
+          id: a.id,
+          name: a.name,
+          type: getAccountCategory(a.type || 'bank'),
+          balance: a.balance,
+          currency: (a.currency && a.currency.trim() ? a.currency : baseCurrency).toUpperCase(),
+          accountNumber: a.accountNumber,
+          color: a.color || getAccountColor(a.type || 'bank'),
+          workspace: (workspace as 'personal' | 'couple') || 'personal',
+        }))
     : [];
 
   // Total convertido a la moneda del espacio
@@ -113,7 +130,9 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
             Gestión de Cuentas
           </h1>
           <p className="text-xs md:text-sm text-gray-400">
-            Administra tus fuentes de dinero, bancos y tarjetas en cualquier divisa.
+            {activeWorkspaceType === 'couple'
+              ? 'Cuentas conjuntas o fondo común de la pareja. Recuerda que al registrar transacciones compartidas también puedes pagar directamente con tus cuentas personales.'
+              : 'Administra tus fuentes de dinero, bancos y tarjetas personales en cualquier divisa.'}
           </p>
         </div>
 
@@ -213,6 +232,7 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {accounts.map((acc) => {
             const isNegative = acc.balance < 0;
+            const isMenuOpen = openMenuId === acc.id;
 
             return (
               <div
@@ -230,9 +250,64 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
                     )}
                   </div>
 
-                  <span className="text-[10px] font-semibold uppercase px-2.5 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700">
-                    {acc.type}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-semibold uppercase px-2.5 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700">
+                      {acc.type}
+                    </span>
+
+                    {/* Actions Menu */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(isMenuOpen ? null : acc.id);
+                        }}
+                        className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
+                        title="Opciones de cuenta"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      {isMenuOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(null);
+                            }}
+                          />
+                          <div className="absolute right-0 top-7 w-36 rounded-xl bg-gray-900 border border-gray-800 shadow-xl py-1 z-40 animate-in fade-in-50 zoom-in-95">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(null);
+                                setEditingAccount(acc);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-200 hover:text-white hover:bg-indigo-600/20 transition-colors text-left cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5 text-indigo-400" />
+                              <span>Editar</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(null);
+                                setAccountToDelete(acc);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-left cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                              <span>Eliminar</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-1 mb-4">
@@ -265,11 +340,132 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal Crear Cuenta */}
       <CreateAccountModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
+
+      {/* Modal Editar Cuenta */}
+      <EditAccountModal
+        isOpen={Boolean(editingAccount)}
+        onClose={() => setEditingAccount(null)}
+        account={editingAccount}
+      />
+
+      {/* Modal Confirmar Eliminación con opción de transferir saldo */}
+      {accountToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in-50">
+          <div className="relative w-full max-w-sm bg-[#0f172a] border border-gray-800 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">¿Eliminar Cuenta?</h3>
+                <p className="text-xs text-gray-400">Esta acción no se puede deshacer</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-300 leading-relaxed">
+              ¿Estás seguro de que deseas eliminar la cuenta <strong className="text-white">"{accountToDelete.name}"</strong> con saldo de <strong>{formatCurrency(accountToDelete.balance, accountToDelete.currency)}</strong>?
+            </p>
+
+            {/* Si la cuenta tiene saldo positivo y hay otras cuentas disponibles */}
+            {accountToDelete.balance > 0 && accounts.filter((a) => a.id !== accountToDelete.id).length > 0 && (
+              <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300">
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
+                  <span>Transferir saldo remanente (Opcional)</span>
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  Transfiere los <strong>{formatCurrency(accountToDelete.balance, accountToDelete.currency)}</strong> a otra cuenta antes de eliminarla:
+                </p>
+                <select
+                  value={targetTransferAccountId}
+                  onChange={(e) => setTargetTransferAccountId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500 cursor-pointer"
+                >
+                  <option value="">No transferir (descartar saldo)</option>
+                  {accounts
+                    .filter((a) => a.id !== accountToDelete.id)
+                    .map((dest) => (
+                      <option key={dest.id} value={dest.id}>
+                        {dest.name} ({dest.currency}) - Saldo actual: {formatCurrency(dest.balance, dest.currency)}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAccountToDelete(null);
+                  setTargetTransferAccountId('');
+                  setDeleteError(null);
+                }}
+                disabled={isDeletingAccount || isCreatingTransfer || isDeletingLoading}
+                className="flex-1 py-2.5 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium text-xs transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setDeleteError(null);
+                  setIsDeletingLoading(true);
+                  try {
+                    // Si se seleccionó transferir el saldo a otra cuenta
+                    if (targetTransferAccountId && accountToDelete.balance > 0) {
+                      const destAccount = accounts.find((a) => a.id === targetTransferAccountId);
+                      if (destAccount) {
+                        await createTransactionMut({
+                          workspaceId: activeWorkspaceId!,
+                          accountId: accountToDelete.id,
+                          targetAccountId: destAccount.id,
+                          amount: Number(accountToDelete.balance),
+                          currency: accountToDelete.currency,
+                          type: 'TRANSFER',
+                          description: `Transferencia por cierre/eliminación de cuenta "${accountToDelete.name}" hacia "${destAccount.name}"`,
+                          transactionDate: new Date().toISOString(),
+                        });
+                      }
+                    }
+
+                    await deleteAccountMut(accountToDelete.id);
+                    setAccountToDelete(null);
+                    setTargetTransferAccountId('');
+                  } catch (delErr: any) {
+                    console.error('Error al eliminar cuenta:', delErr);
+                    setDeleteError(delErr?.message || 'Error al eliminar la cuenta. Inténtalo nuevamente.');
+                  } finally {
+                    setIsDeletingLoading(false);
+                  }
+                }}
+                disabled={isDeletingAccount || isCreatingTransfer || isDeletingLoading}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isDeletingAccount || isCreatingTransfer || isDeletingLoading ? (
+                  <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Eliminar</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
