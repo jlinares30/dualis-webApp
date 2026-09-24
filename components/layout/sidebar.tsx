@@ -66,10 +66,10 @@ export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
     'tu pareja';
   const resolvedPartnerName = capitalize(rawPartnerName);
 
-  // En Modo Personal (!hasPartner), ocultamos Liquidación y Espacios de la navegación lateral.
+  // Opción A: Liquidación y Espacios solo aparecen cuando el usuario está navegando dentro del Espacio de Pareja
   const filteredNavItems = navigationItems.filter((item) => {
-    if (!hasPartner && (item.href === '/settlements' || item.href === '/workspaces')) {
-      return false;
+    if (item.href === '/settlements' || item.href === '/workspaces') {
+      return isCoupleWorkspace;
     }
     return true;
   });
@@ -107,6 +107,7 @@ export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
         {filteredNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href;
+          const isCoupleFeature = item.href === '/settlements' || item.href === '/workspaces';
 
           return (
             <Link
@@ -114,19 +115,27 @@ export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
               href={item.href}
               onClick={() => setMobileOpen(false)}
               className={cn(
-                'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group',
+                'flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group',
                 isActive
                   ? 'bg-indigo-600/15 text-indigo-400 border border-indigo-500/30 shadow-sm'
                   : 'text-gray-400 hover:text-gray-100 hover:bg-gray-800/50'
               )}
             >
-              <Icon
-                className={cn(
-                  'w-5 h-5 transition-colors',
-                  isActive ? 'text-indigo-400' : 'text-gray-400 group-hover:text-gray-200'
-                )}
-              />
-              <span>{item.name}</span>
+              <div className="flex items-center gap-3">
+                <Icon
+                  className={cn(
+                    'w-5 h-5 transition-colors',
+                    isActive ? 'text-indigo-400' : 'text-gray-400 group-hover:text-gray-200'
+                  )}
+                />
+                <span>{item.name}</span>
+              </div>
+
+              {isCoupleFeature && (
+                <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 tracking-wider">
+                  pareja
+                </span>
+              )}
             </Link>
           );
         })}

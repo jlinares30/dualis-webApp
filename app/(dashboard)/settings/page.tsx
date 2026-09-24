@@ -26,7 +26,8 @@ import {
   X,
   FileText,
   CheckCircle2,
-  History
+  History,
+  Copy
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
@@ -95,6 +96,13 @@ export default function SettingsPage() {
   const [fullName, setFullName] = useState(user?.fullName || 'Sin nombre');
   const [email] = useState(user?.email || 'no-email');
   const [currency, setCurrency] = useState(user?.preferredCurrency || 'PEN');
+  const [coupleCurrency, setCoupleCurrency] = useState(coupleWs?.currency || 'PEN');
+
+  useEffect(() => {
+    if (coupleWs?.currency) {
+      setCoupleCurrency(coupleWs.currency);
+    }
+  }, [coupleWs?.currency]);
 
   const [partnerInputName, setPartnerInputName] = useState(
     hasPartner && partnerName && partnerName.toLowerCase() !== 'pareja' ? capitalize(partnerName) : ''
@@ -121,7 +129,16 @@ export default function SettingsPage() {
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [closingSnapshot, setClosingSnapshot] = useState<ClosedWorkspaceSnapshot | null>(null);
 
-  const realInviteCode = inviteData?.code || '';
+  const effectiveCoupleWs = coupleWs || workspaces.find((w) => w.id === activeWorkspaceId && (w.type === 'COUPLE' || (w.type as any) === 'couple'));
+  const isCoupleFullyJoined = Boolean(
+    effectiveCoupleWs?.members && effectiveCoupleWs.members.length >= 2
+  );
+  const realInviteCode =
+    effectiveCoupleWs?.invitationCode ||
+    effectiveCoupleWs?.inviteCode ||
+    inviteData?.code ||
+    (storedPartnerEmail && storedPartnerEmail.startsWith('DUAL') ? storedPartnerEmail : '') ||
+    '';
 
   const handleGenerateCoupleCode = async () => {
     setJoinError(null);
@@ -139,7 +156,9 @@ export default function SettingsPage() {
         setActiveWorkspace(created.id, 'COUPLE');
         const codeToLink = created.invitationCode || created.inviteCode || 'Código Generado';
         linkPartner(partnerInputName || 'Pareja', codeToLink, selectedRule);
-        setJoinSuccess('Espacio de Pareja creado con éxito. Comparte el código con tu pareja.');
+        queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+        queryClient.invalidateQueries({ queryKey: ['inviteCode'] });
+        setJoinSuccess(`¡Espacio de Pareja creado con éxito! Tu código es: ${codeToLink}`);
       }
     } catch (err: any) {
       console.error('Error al crear espacio pareja:', err);
@@ -280,17 +299,34 @@ export default function SettingsPage() {
         preferredCurrency: currency,
       });
 
-      if (activeWorkspaceId) {
+      // Actualizar moneda del workspace personal
+      const personalWs = workspaces.find((w) => w.type === 'INDIVIDUAL' || (w.type as any) === 'personal');
+      if (personalWs?.id) {
         try {
           await updateWorkspaceMut({
-            id: activeWorkspaceId,
+            id: personalWs.id,
             data: { currency },
           });
-          useWorkspaceStore.getState().updateWorkspaceCurrency(activeWorkspaceId, currency);
-        } catch (wErr) {
-          console.error('Error al actualizar workspace en API:', wErr);
+          useWorkspaceStore.getState().updateWorkspaceCurrency(personalWs.id, currency);
+        } catch (pwErr) {
+          console.error('Error al actualizar moneda en workspace personal:', pwErr);
         }
+      }
 
+      // Si existe un espacio de pareja, actualizar su moneda compartida
+      if (coupleWs?.id) {
+        try {
+          await updateWorkspaceMut({
+            id: coupleWs.id,
+            data: { currency: coupleCurrency },
+          });
+          useWorkspaceStore.getState().updateWorkspaceCurrency(coupleWs.id, coupleCurrency);
+        } catch (cwErr) {
+          console.error('Error al actualizar moneda en workspace de pareja:', cwErr);
+        }
+      }
+
+      if (activeWorkspaceId) {
         if (hasPartner) {
           try {
             const apiSplitType = selectedRule === 'PROPORTIONAL_INCOME' ? 'PROPORTIONAL'
@@ -455,12 +491,22 @@ export default function SettingsPage() {
                 <ShieldCheck className="w-5 h-5 text-emerald-400" />
               </div>
 
-              {/* Tu Código de Invitación */}
-              {realInviteCode && (
-                <div className="p-4 rounded-2xl bg-gray-900/90 border border-gray-800 space-y-2">
-                  <span className="block text-[10px] text-gray-400 uppercase font-semibold">Código de Invitación de este Espacio</span>
-                  <div className="flex items-center gap-2">
-                    <code className="px-3 py-1.5 rounded-xl bg-gray-950 text-indigo-400 font-mono text-xs font-bold border border-gray-800 flex-1">
+              {/* Tu Código de Invitación - Solo visible si la pareja aún NO se ha unido (esperando segundo miembro) */}
+              {!isCoupleFullyJoined && realInviteCode && (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-indigo-950/40 to-purple-950/30 border border-indigo-500/30 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="block text-[11px] text-indigo-300 uppercase font-bold tracking-wider">
+                      Tu Código de Invitación
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-medium">
+                      Esperando que tu pareja se una
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-300">
+                    Tu pareja debe ingresar este código de 8 caracteres en su cuenta para unirse a este espacio compartido:
+                  </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <code className="px-4 py-2 rounded-xl bg-gray-950 text-indigo-300 font-mono text-sm font-black border border-indigo-500/40 tracking-widest flex-1 text-center sm:text-left select-all">
                       {realInviteCode}
                     </code>
                     <button
@@ -470,9 +516,19 @@ export default function SettingsPage() {
                         setCopied(true);
                         setTimeout(() => setCopied(false), 2000);
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs font-semibold hover:bg-indigo-600/30 transition-all cursor-pointer"
+                      className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer shrink-0"
                     >
-                      {copied ? '¡Copiado!' : 'Copiar Código'}
+                      {copied ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-300" />
+                          <span>¡Copiado!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copiar Código</span>
+                        </>
+                      )}
                     </button>
                   </div>
                 </div>
@@ -746,38 +802,93 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* Regional Preferences & Base Currency */}
-        <div className="rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 p-6 shadow-xl space-y-4">
+        {/* Regional Preferences & Base Currencies */}
+        <div className="rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 p-6 shadow-xl space-y-6">
           <div className="flex items-center gap-3 pb-3 border-b border-gray-800/60">
             <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
               <Globe className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-bold text-base text-white">Moneda Base del Espacio</h2>
-              <p className="text-xs text-gray-400">Moneda en la que se consolidan y muestran los totales</p>
+              <h2 className="font-bold text-base text-white">Monedas Base de los Espacios</h2>
+              <p className="text-xs text-gray-400">Define en qué divisa se consolidan tus cuentas personales y en pareja</p>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-gray-300 mb-1.5">
-              Moneda Principal
-            </label>
-            <select
-              value={currency}
-              onChange={(e) => setCurrency(e.target.value)}
-              className="w-full sm:w-64 px-3.5 py-2.5 rounded-xl bg-gray-900/90 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500 transition-all cursor-pointer"
-            >
-              <option value="PEN">PEN (S/) - Sol Peruano</option>
-              <option value="USD">USD ($) - Dólar Estadounidense</option>
-              <option value="EUR">EUR (€) - Euro</option>
-              <option value="COP">COP ($) - Peso Colombiano</option>
-              <option value="MXN">MXN ($) - Peso Mexicano</option>
-              <option value="ARS">ARS ($) - Peso Argentino</option>
-              <option value="CLP">CLP ($) - Peso Chileno</option>
-              <option value="BRL">BRL (R$) - Real Brasileño</option>
-              <option value="GBP">GBP (£) - Libra Esterlina</option>
-              <option value="CAD">CAD ($) - Dólar Canadiense</option>
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Moneda Personal */}
+            <div className="p-4 rounded-2xl bg-gray-900/60 border border-gray-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="block text-xs font-bold text-white">Moneda Base Personal</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 font-semibold">
+                  Individual
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                Divisa principal en la que se consolidan tus reportes, métricas del Dashboard, presupuestos individuales y metas de ahorro.
+              </p>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full mt-2 px-3.5 py-2.5 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white outline-none focus:border-blue-500 transition-all cursor-pointer"
+              >
+                <option value="PEN">PEN (S/) - Sol Peruano</option>
+                <option value="USD">USD ($) - Dólar Estadounidense</option>
+                <option value="EUR">EUR (€) - Euro</option>
+                <option value="COP">COP ($) - Peso Colombiano</option>
+                <option value="MXN">MXN ($) - Peso Mexicano</option>
+                <option value="ARS">ARS ($) - Peso Argentino</option>
+                <option value="CLP">CLP ($) - Peso Chileno</option>
+                <option value="BRL">BRL (R$) - Real Brasileño</option>
+                <option value="GBP">GBP (£) - Libra Esterlina</option>
+                <option value="CAD">CAD ($) - Dólar Canadiense</option>
+              </select>
+            </div>
+
+            {/* Moneda de Pareja */}
+            <div className="p-4 rounded-2xl bg-gray-900/60 border border-gray-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="block text-xs font-bold text-white">Moneda Base de Pareja</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+                  Compartido
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-400 leading-snug">
+                {coupleWs ? (
+                  <>Divisa unificada en la que se calculan los balances totales, gastos comunes y la <strong>liquidación neta de deudas</strong>.</>
+                ) : (
+                  <>Moneda que adoptará el espacio compartido para reportes y liquidaciones una vez que te vincules con tu pareja.</>
+                )}
+              </p>
+              <select
+                value={coupleCurrency}
+                onChange={(e) => setCoupleCurrency(e.target.value)}
+                className="w-full mt-2 px-3.5 py-2.5 rounded-xl bg-gray-950 border border-gray-800 text-xs text-emerald-300 font-semibold outline-none focus:border-emerald-500 transition-all cursor-pointer"
+              >
+                <option value="PEN">PEN (S/) - Sol Peruano</option>
+                <option value="USD">USD ($) - Dólar Estadounidense</option>
+                <option value="EUR">EUR (€) - Euro</option>
+                <option value="COP">COP ($) - Peso Colombiano</option>
+                <option value="MXN">MXN ($) - Peso Mexicano</option>
+                <option value="ARS">ARS ($) - Peso Argentino</option>
+                <option value="CLP">CLP ($) - Peso Chileno</option>
+                <option value="BRL">BRL (R$) - Real Brasileño</option>
+                <option value="GBP">GBP (£) - Libra Esterlina</option>
+                <option value="CAD">CAD ($) - Dólar Canadiense</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Nota aclaratoria sobre cuentas multimoneda independientes */}
+          <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-start gap-3">
+            <div className="p-1 rounded-lg bg-indigo-500/20 text-indigo-400 shrink-0 mt-0.5">
+              <Sparkles className="w-3.5 h-3.5" />
+            </div>
+            <div className="space-y-1 text-xs">
+              <span className="font-bold text-indigo-200 block">Independencia de Monedas en Cuentas y Movimientos</span>
+              <p className="text-[11px] text-gray-300 leading-relaxed">
+                Esta configuración define la <strong>moneda de consolidación</strong> (para dashboards, totales y liquidaciones). Al crear una nueva <strong>cuenta bancaria, billetera o tarjeta</strong> en la sección de Cuentas, puedes elegir de forma totalmente independiente su propia moneda (ej. puedes tener cuentas en USD y PEN dentro del mismo espacio). El sistema convertirá automáticamente los saldos usando las tasas referenciales configuradas abajo.
+              </p>
+            </div>
           </div>
         </div>
 

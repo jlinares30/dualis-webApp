@@ -13,7 +13,9 @@ import {
   Crown,
   AlertCircle,
   Building2,
-  CheckCircle2
+  CheckCircle2,
+  User,
+  ExternalLink
 } from 'lucide-react';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
@@ -25,6 +27,7 @@ export default function WorkspacesPage() {
     workspaces, 
     activeWorkspaceId, 
     setActiveWorkspace,
+    hasPartner,
     partnerName,
     linkPartner
   } = useWorkspaceStore();
@@ -84,6 +87,7 @@ export default function WorkspacesPage() {
   };
 
   const membersList = activeWs?.members || [];
+  const isCoupleFullyJoined = Boolean(isCouple && membersList.length >= 2);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 max-w-5xl">
@@ -181,8 +185,8 @@ export default function WorkspacesPage() {
               </p>
             </div>
 
-            {/* Copy Invite Code Box (Only if COUPLE workspace) */}
-            {isCouple && (
+            {/* Copy Invite Code Box (Only if COUPLE workspace and NOT fully joined yet) */}
+            {isCouple && !isCoupleFullyJoined && (
               <div className="w-full md:w-auto bg-gray-900/90 border border-gray-800 p-4 rounded-2xl space-y-2">
                 <span className="block text-[10px] text-gray-400 uppercase font-semibold">Código de Invitación Oficial</span>
                 <div className="flex items-center gap-2">
@@ -197,6 +201,17 @@ export default function WorkspacesPage() {
                   >
                     {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                   </button>
+                </div>
+              </div>
+            )}
+            {isCouple && isCoupleFullyJoined && (
+              <div className="w-full md:w-auto bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-white">Espacio 100% Vinculado</span>
+                  <span className="text-[11px] text-emerald-400">Capacidad máxima alcanzada (2/2 miembros)</span>
                 </div>
               </div>
             )}
@@ -292,63 +307,120 @@ export default function WorkspacesPage() {
           )}
         </div>
 
-        {/* Join Space Box (1 col) */}
-        <div className="rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 p-6 shadow-xl space-y-4">
-          <div className="flex items-center gap-2.5 pb-3 border-b border-gray-800/60">
-            <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
-              <UserPlus className="w-5 h-5" />
+        {/* Right Column: Status / Actions depending on active workspace */}
+        {!isCouple ? (
+          /* Vista cuando el usuario está en su Espacio Personal */
+          <div className="rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 p-6 shadow-xl space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-gray-800/60">
+                <div className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                  <User className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white">Espacio Personal</h3>
+                  <p className="text-xs text-gray-400">Finanzas exclusivamente privadas</p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-blue-500/10 border border-blue-500/20 space-y-1.5">
+                <span className="text-xs font-bold text-blue-400 block">Privacidad Garantizada</span>
+                <p className="text-xs text-gray-300 leading-relaxed">
+                  Las cuentas, movimientos y presupuestos registrados en este espacio son estrictamente individuales y nunca se comparten con tu pareja ni generan saldos de deuda.
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-bold text-base text-white">Unirse a un Espacio</h3>
-              <p className="text-xs text-gray-400">Ingresa un código de pareja</p>
+
+            <div className="pt-3 border-t border-gray-800/60 text-[11px] text-gray-400 flex items-center gap-2">
+              <Building2 className="w-4 h-4 text-blue-400 shrink-0" />
+              <span>Puedes alternar entre tus finanzas personales y en pareja desde la cuadrícula superior.</span>
             </div>
           </div>
-
-          {joinError && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{joinError}</span>
-            </div>
-          )}
-
-          {joinSuccess && (
-            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
-              <span>{joinSuccess}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleJoinSpace} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1.5">
-                Código de Invitación (8 Caracteres)
-              </label>
-              <input
-                type="text"
-                value={joinCode}
-                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="Ej. DUAL8X9P"
-                maxLength={12}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900/90 border border-gray-800 text-xs text-indigo-400 placeholder-gray-500 outline-none focus:border-purple-500 transition-all font-mono uppercase font-bold"
-              />
+        ) : !hasPartner && !isCoupleFullyJoined ? (
+          /* Vista cuando está en Espacio de Pareja pero aún no se vincula */
+          <div className="rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 p-6 shadow-xl space-y-4">
+            <div className="flex items-center gap-2.5 pb-3 border-b border-gray-800/60">
+              <div className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
+                <UserPlus className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">Unirse a un Espacio</h3>
+                <p className="text-xs text-gray-400">Ingresa un código de pareja</p>
+              </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={isJoining}
-              className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-600/25 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isJoining ? (
-                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <UserCheck className="w-4 h-4" />
-                  <span>Vincular Código</span>
-                </>
-              )}
-            </button>
-          </form>
-        </div>
+            {joinError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{joinError}</span>
+              </div>
+            )}
+
+            {joinSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{joinSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleJoinSpace} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1.5">
+                  Código de Invitación (8 Caracteres)
+                </label>
+                <input
+                  type="text"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="Ej. DUAL8X9P"
+                  maxLength={12}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900/90 border border-gray-800 text-xs text-indigo-400 placeholder-gray-500 outline-none focus:border-purple-500 transition-all font-mono uppercase font-bold"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isJoining}
+                className="w-full py-2.5 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-lg shadow-purple-600/25 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isJoining ? (
+                  <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <UserCheck className="w-4 h-4" />
+                    <span>Vincular Código</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+        ) : (
+          /* Vista cuando está en Espacio de Pareja y la vinculación está completa */
+          <div className="rounded-3xl bg-[#0f172a]/90 border border-emerald-500/20 p-6 shadow-xl space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2.5 pb-3 border-b border-gray-800/60">
+                <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-white">Vinculación Completa</h3>
+                  <p className="text-xs text-gray-400">Espacio exclusivo para 2 integrantes</p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-1.5">
+                <span className="text-xs font-bold text-emerald-400 block">Sincronización Activa</span>
+                <p className="text-xs text-gray-300 leading-relaxed">
+                  Tu espacio en pareja está activo con ambos miembros conectados. Las invitaciones y códigos adicionales han sido deshabilitados para proteger la privacidad financiera.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-gray-800/60 text-[11px] text-gray-400 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Para cambiar de pareja debes desvincular el espacio actual en Configuración.</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
