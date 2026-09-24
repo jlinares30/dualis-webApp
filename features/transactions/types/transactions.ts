@@ -35,7 +35,9 @@ export interface TransactionDTO {
 export interface CreateTransactionRequest {
   workspaceId: string;
   accountId: string;
+  targetAccountId?: string;
   categoryId?: string;
+  categoryNature?: 'NEED' | 'WANT' | 'SAVINGS' | 'INVESTMENT' | 'DEBT';
   amount: number;
   currency?: string;
   type: BackendTransactionType;

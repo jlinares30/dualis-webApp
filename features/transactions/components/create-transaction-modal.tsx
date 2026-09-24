@@ -45,18 +45,61 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
   }, [isOpen, hasPartner, defaultSplitRule, defaultUserPercentage, userMonthlyIncome, partnerMonthlyIncome]);
 
   const { mutateAsync: createTx, isPending } = useCreateTransaction();
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const activeWorkspaceType = useWorkspaceStore((state) => state.activeWorkspaceType);
+
+  const personalWs = workspaces.find((w) => w.type === 'INDIVIDUAL' || (w.type as any) === 'personal');
+  const coupleWs = workspaces.find((w) => w.type === 'COUPLE' || (w.type as any) === 'couple');
+  const isCoupleWorkspace = activeWorkspaceType === 'couple' || activeWorkspaceType === 'COUPLE';
+
+  // Cuentas del workspace activo
   const { data: accountsData } = useAccounts();
+  // Cuentas del espacio personal (si estamos en el espacio de pareja)
+  const { data: personalAccountsData } = useAccounts(
+    isCoupleWorkspace && personalWs?.id ? personalWs.id : undefined
+  );
+
   const { mutateAsync: createAccount } = useCreateAccount();
   const { data: categoriesData } = useCategories(type === 'income' ? 'INCOME' : 'EXPENSE');
   const { mutateAsync: createCategory } = useCreateCategory();
   const { data: txPage } = useTransactions(0, 100);
   const { data: splitRules = [] } = useSplitRules();
 
-  useEffect(() => {
-    if (accountsData && accountsData.length > 0 && !selectedAccountId) {
-      setSelectedAccountId(accountsData[0].id);
+  // Lista combinada de cuentas
+  const availableAccounts = React.useMemo(() => {
+    if (!isCoupleWorkspace) {
+      return accountsData || [];
     }
-  }, [accountsData, selectedAccountId]);
+
+    const personal = (personalAccountsData || []).map((acc) => ({
+      ...acc,
+      _group: 'Mis Cuentas Personales',
+    }));
+
+    const couple = (accountsData || []).map((acc) => ({
+      ...acc,
+      _group: 'Cuentas Compartidas / Pareja',
+    }));
+
+    // Si la misma cuenta estuviera en ambas listas, evitar duplicados por ID
+    const seen = new Set<string>();
+    const combined: (typeof personal[0])[] = [];
+
+    [...personal, ...couple].forEach((acc) => {
+      if (!seen.has(acc.id)) {
+        seen.add(acc.id);
+        combined.push(acc);
+      }
+    });
+
+    return combined;
+  }, [isCoupleWorkspace, accountsData, personalAccountsData]);
+
+  useEffect(() => {
+    if (availableAccounts.length > 0 && !selectedAccountId) {
+      setSelectedAccountId(availableAccounts[0].id);
+    }
+  }, [availableAccounts, selectedAccountId]);
 
   useEffect(() => {
     if (categoriesData && categoriesData.length > 0 && !selectedCategoryId) {
@@ -268,14 +311,43 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
               <select
                 value={selectedAccountId}
                 onChange={(e) => setSelectedAccountId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500 cursor-pointer"
               >
-                {accountsData && accountsData.length > 0 ? (
-                  accountsData.map((acc) => (
-                    <option key={acc.id} value={acc.id}>
-                      {acc.name} ({acc.currency || 'PEN'} {acc.balance ?? 0})
-                    </option>
-                  ))
+                {availableAccounts && availableAccounts.length > 0 ? (
+                  isCoupleWorkspace ? (
+                    <>
+                      {/* Cuentas Personales */}
+                      {availableAccounts.some((a) => (a as any)._group === 'Mis Cuentas Personales') && (
+                        <optgroup label="👤 Mis Cuentas Personales (Recomendado)">
+                          {availableAccounts
+                            .filter((a) => (a as any)._group === 'Mis Cuentas Personales')
+                            .map((acc) => (
+                              <option key={acc.id} value={acc.id}>
+                                {acc.name} ({acc.currency || 'PEN'} {acc.balance ?? 0})
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                      {/* Cuentas Compartidas */}
+                      {availableAccounts.some((a) => (a as any)._group === 'Cuentas Compartidas / Pareja') && (
+                        <optgroup label="👥 Cuentas Compartidas de Pareja">
+                          {availableAccounts
+                            .filter((a) => (a as any)._group === 'Cuentas Compartidas / Pareja')
+                            .map((acc) => (
+                              <option key={acc.id} value={acc.id}>
+                                {acc.name} ({acc.currency || 'PEN'} {acc.balance ?? 0})
+                              </option>
+                            ))}
+                        </optgroup>
+                      )}
+                    </>
+                  ) : (
+                    availableAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} ({acc.currency || 'PEN'} {acc.balance ?? 0})
+                      </option>
+                    ))
+                  )
                 ) : (
                   <option value="">Cuenta Principal (Autocrear)</option>
                 )}
