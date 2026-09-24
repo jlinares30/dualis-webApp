@@ -9,8 +9,9 @@ import {
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
-export function useInvestments() {
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+export function useInvestments(customWorkspaceId?: string) {
+  const storeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const activeWorkspaceId = customWorkspaceId || storeWorkspaceId;
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
