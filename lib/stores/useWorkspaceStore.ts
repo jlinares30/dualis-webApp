@@ -28,6 +28,7 @@ interface WorkspaceState {
   lastClosedSnapshot: ClosedWorkspaceSnapshot | null;
   defaultSplitRule: DefaultSplitRule;
   defaultUserPercentage: number;
+  defaultSettlementAccountId?: string | null;
   userMonthlyIncome?: number;
   partnerMonthlyIncome?: number;
   workspaces: WorkspaceDTO[];
@@ -38,6 +39,7 @@ interface WorkspaceState {
   unlinkPartner: (snapshot?: ClosedWorkspaceSnapshot) => void;
   clearClosedSnapshot: () => void;
   setDefaultSplitRule: (rule: DefaultSplitRule, percentage?: number) => void;
+  setDefaultSettlementAccountId: (accountId: string | null) => void;
   setMonthlyIncomes: (userIncome: number, partnerIncome: number) => void;
   updateWorkspaceCurrency: (workspaceId: string, currency: string) => void;
 }
@@ -52,6 +54,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       partnerEmail: null,
       defaultSplitRule: 'PROPORTIONAL_INCOME', // Por defecto en proporción a ingresos cuando se vinculen
       defaultUserPercentage: 50,
+      defaultSettlementAccountId: null,
       userMonthlyIncome: 0,
       partnerMonthlyIncome: 0,
       workspaces: [],
@@ -154,6 +157,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         set((state: WorkspaceState) => ({
           defaultSplitRule: rule,
           defaultUserPercentage: percentage !== undefined ? percentage : state.defaultUserPercentage,
+        })),
+      setDefaultSettlementAccountId: (accountId: string | null) =>
+        set(() => ({
+          defaultSettlementAccountId: accountId,
         })),
       setMonthlyIncomes: (userIncome: number, partnerIncome: number) =>
         set(() => {

@@ -9,18 +9,22 @@ import { CreateSettlementPayload } from '@/types';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
-export function useDebtBalanceSummary() {
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+export function useDebtBalanceSummary(customWorkspaceId?: string) {
+  const storeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
-  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
-  const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
-  const isCoupleWorkspace = activeWs?.type === 'COUPLE';
+  // Si se pasa un customWorkspaceId se usa, de lo contrario se busca el workspace de pareja si está en modo couple
+  const coupleWs = workspaces.find((w) => w.type === 'COUPLE' || (w.type as any) === 'couple');
+  const targetWorkspaceId = customWorkspaceId || (coupleWs ? coupleWs.id : storeWorkspaceId);
+
+  const targetWs = workspaces.find((w) => w.id === targetWorkspaceId);
+  const isValidUuid = targetWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(targetWorkspaceId);
+  const isCoupleWorkspace = targetWs?.type === 'COUPLE';
 
   return useQuery({
-    queryKey: ['debtBalanceSummary', activeWorkspaceId],
-    queryFn: () => getDebtBalanceSummary(activeWorkspaceId!),
+    queryKey: ['debtBalanceSummary', targetWorkspaceId],
+    queryFn: () => getDebtBalanceSummary(targetWorkspaceId!),
     enabled: isAuthenticated && Boolean(isValidUuid) && Boolean(isCoupleWorkspace),
     retry: false,
     refetchInterval: 5000,
@@ -28,18 +32,21 @@ export function useDebtBalanceSummary() {
   });
 }
 
-export function useSettlementsHistory() {
-  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+export function useSettlementsHistory(customWorkspaceId?: string) {
+  const storeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const workspaces = useWorkspaceStore((state) => state.workspaces);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
-  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
-  const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
-  const isCoupleWorkspace = activeWs?.type === 'COUPLE';
+  const coupleWs = workspaces.find((w) => w.type === 'COUPLE' || (w.type as any) === 'couple');
+  const targetWorkspaceId = customWorkspaceId || (coupleWs ? coupleWs.id : storeWorkspaceId);
+
+  const targetWs = workspaces.find((w) => w.id === targetWorkspaceId);
+  const isValidUuid = targetWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(targetWorkspaceId);
+  const isCoupleWorkspace = targetWs?.type === 'COUPLE';
 
   return useQuery({
-    queryKey: ['settlementsHistory', activeWorkspaceId],
-    queryFn: () => getSettlementsByWorkspace(activeWorkspaceId!),
+    queryKey: ['settlementsHistory', targetWorkspaceId],
+    queryFn: () => getSettlementsByWorkspace(targetWorkspaceId!),
     enabled: isAuthenticated && Boolean(isValidUuid) && Boolean(isCoupleWorkspace),
     retry: false,
   });

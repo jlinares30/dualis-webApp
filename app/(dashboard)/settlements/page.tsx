@@ -5,41 +5,67 @@ import {
   HeartHandshake, 
   CheckCircle2, 
   Clock, 
-  Send,
-  ArrowUpRight,
-  ArrowDownLeft,
-  X,
-  AlertCircle,
-  TrendingUp,
-  Receipt,
-  Sparkles
+  Send, 
+  ArrowUpRight, 
+  ArrowDownLeft, 
+  X, 
+  AlertCircle, 
+  TrendingUp, 
+  Receipt, 
+  Sparkles,
+  Wallet,
+  Settings2,
+  Check
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, capitalize } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
-import { useDebtBalanceSummary, useSettlementsHistory, useCreateSettlement } from '@/features/settlements';
+import { useDebtBalanceSummary, useSettlementsHistory, useCreateSettlement, completeSettlement } from '@/features/settlements';
+import { useAccounts } from '@/features/accounts';
+import { useCreateTransaction } from '@/features/transactions';
+import { useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 
 export default function SettlementPage() {
+  const queryClient = useQueryClient();
   const { user } = useAuthStore();
-  const { 
-    activeWorkspaceId, 
-    partnerName, 
-    partnerEmail,
-    hasPartner, 
-    workspaces 
-  } = useWorkspaceStore();
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const partnerName = useWorkspaceStore((state) => state.partnerName);
+  const partnerEmail = useWorkspaceStore((state) => state.partnerEmail);
+  const hasPartner = useWorkspaceStore((state) => state.hasPartner);
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const defaultSettlementAccountId = useWorkspaceStore((state) => state.defaultSettlementAccountId);
+  const setDefaultSettlementAccountId = useWorkspaceStore((state) => state.setDefaultSettlementAccountId);
 
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const personalWs = workspaces.find((w) => w.type === 'INDIVIDUAL' || (w.type as any) === 'personal');
+  const coupleWs = workspaces.find((w) => w.type === 'COUPLE' || (w.type as any) === 'couple');
   const isCoupleWorkspace = activeWs?.type === 'COUPLE';
-
-  const { data: balanceSummary, isLoading: isLoadingSummary } = useDebtBalanceSummary();
-  const { data: settlementsHistory, isLoading: isLoadingHistory } = useSettlementsHistory();
+  const coupleWorkspaceId = coupleWs?.id || (isCoupleWorkspace ? activeWorkspaceId : undefined);
+  const { data: balanceSummary, isLoading: isLoadingSummary } = useDebtBalanceSummary(coupleWorkspaceId || undefined);
+  const { data: settlementsHistory, isLoading: isLoadingHistory } = useSettlementsHistory(coupleWorkspaceId || undefined);
   const { mutateAsync: createSettlementMut, isPending: isSubmitting } = useCreateSettlement();
+  const { mutateAsync: createTxMut } = useCreateTransaction();
+
+  // Obtener exclusivamente las cuentas del espacio personal / individual (no cuentas mutuas)
+  const { data: personalAccounts = [] } = useAccounts(personalWs?.id || undefined);
+
+  // Lista exclusiva de cuentas personales para liquidaciones
+  const availableAccounts = React.useMemo(() => {
+    return personalAccounts.filter((acc) => {
+      if (!acc || !acc.id) return false;
+      // Excluir si explícitamente pertenece al workspace de pareja
+      const coupleWs = workspaces.find((w) => w.type === 'COUPLE' || (w.type as any) === 'couple');
+      if (coupleWs && acc.workspaceId === coupleWs.id) return false;
+      return true;
+    });
+  }, [personalAccounts, workspaces]);
 
   // Modal / Form state
   const [modalOpen, setModalOpen] = useState(false);
   const [customAmount, setCustomAmount] = useState<string>('');
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [saveAsDefaultAccount, setSaveAsDefaultAccount] = useState<boolean>(true);
   const [note, setNote] = useState<string>('Liquidación de gastos compartidos');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -53,10 +79,34 @@ export default function SettlementPage() {
   const isUserDebtor = debtorEmail && currentUserEmail.toLowerCase() === debtorEmail.toLowerCase();
   const isUserCreditor = creditorEmail && currentUserEmail.toLowerCase() === creditorEmail.toLowerCase();
 
-  const otherPartnerName = partnerName || (partnerEmail ? partnerEmail.split('@')[0] : 'tu pareja');
+  // Resolver el nombre real de la pareja desde los miembros del espacio si en el store dice 'pareja'
+  const partnerMember = coupleWs?.members?.find((m) => m.userEmail !== user?.email && m.userId !== user?.id);
+  const rawPartnerName =
+    partnerMember?.userName ||
+    (partnerMember?.userEmail ? partnerMember.userEmail.split('@')[0] : null) ||
+    (partnerName && partnerName.toLowerCase() !== 'pareja' && partnerName.toLowerCase() !== 'tu pareja' ? partnerName : null) ||
+    (partnerEmail ? partnerEmail.split('@')[0] : null) ||
+    'tu pareja';
+  const otherPartnerName = rawPartnerName !== 'tu pareja' ? capitalize(rawPartnerName) : 'tu pareja';
+
+  // Inicializar o ajustar cuenta seleccionada con base en defaultSettlementAccountId
+  React.useEffect(() => {
+    if (availableAccounts.length > 0) {
+      if (defaultSettlementAccountId && availableAccounts.some((a) => a.id === defaultSettlementAccountId)) {
+        setSelectedAccountId(defaultSettlementAccountId);
+      } else if (!selectedAccountId) {
+        setSelectedAccountId(availableAccounts[0].id);
+      }
+    }
+  }, [availableAccounts, defaultSettlementAccountId, selectedAccountId]);
 
   const openSettleModal = () => {
     setCustomAmount(netBalance > 0 ? netBalance.toString() : '0');
+    if (defaultSettlementAccountId && availableAccounts.some((a) => a.id === defaultSettlementAccountId)) {
+      setSelectedAccountId(defaultSettlementAccountId);
+    } else if (availableAccounts.length > 0 && !selectedAccountId) {
+      setSelectedAccountId(availableAccounts[0].id);
+    }
     setErrorMsg(null);
     setSuccessMsg(null);
     setModalOpen(true);
@@ -73,7 +123,8 @@ export default function SettlementPage() {
       return;
     }
 
-    if (!activeWorkspaceId) {
+    const effectiveWsId = coupleWorkspaceId || activeWorkspaceId;
+    if (!effectiveWsId) {
       setErrorMsg('No hay un espacio de pareja seleccionado');
       return;
     }
@@ -90,9 +141,18 @@ export default function SettlementPage() {
       recipientEmail = creditorEmail;
     }
 
+    // Si se marcó recordar como predeterminada, actualizar el store
+    if (saveAsDefaultAccount && selectedAccountId) {
+      if (typeof setDefaultSettlementAccountId === 'function') {
+        setDefaultSettlementAccountId(selectedAccountId);
+      } else {
+        useWorkspaceStore.setState({ defaultSettlementAccountId: selectedAccountId });
+      }
+    }
+
     try {
-      await createSettlementMut({
-        workspaceId: activeWorkspaceId,
+      const createdSettlement = await createSettlementMut({
+        workspaceId: effectiveWsId,
         payerEmail: payerEmail,
         recipientEmail: recipientEmail,
         amount: amountNum,
@@ -100,16 +160,61 @@ export default function SettlementPage() {
         note: note.trim() || 'Liquidación de gastos compartidos',
       });
 
+      // Si el backend crea la liquidación en estado PENDING, completarla de inmediato para que afecte el balance
+      if (createdSettlement && createdSettlement.status === 'PENDING') {
+        try {
+          await completeSettlement(createdSettlement.id);
+        } catch (compErr) {
+          console.error('Error al completar liquidación:', compErr);
+        }
+      }
+
+      // Si seleccionó una cuenta local/bancaria, impactar automáticamente en el balance de esa cuenta
+      if (selectedAccountId) {
+        const chosenAcc = availableAccounts.find((a) => a.id === selectedAccountId);
+        const wsTargetId = chosenAcc?.workspaceId || personalWs?.id || activeWorkspaceId;
+        const isReceiving = isUserCreditor; // Si el usuario es acreedor, está recibiendo el aporte de la pareja
+
+        if (wsTargetId) {
+          try {
+            await createTxMut({
+              workspaceId: wsTargetId,
+              accountId: selectedAccountId,
+              amount: amountNum,
+              type: isReceiving ? 'INCOME' : 'EXPENSE',
+              description: isReceiving
+                ? `Liquidación recibida de ${otherPartnerName}`
+                : `Pago de liquidación a ${otherPartnerName}`,
+              transactionDate: new Date().toISOString(),
+            });
+          } catch (txErr) {
+            console.error('Error al registrar la transacción de liquidación en la cuenta:', txErr);
+          }
+        }
+      }
+
+      // Invalidar queries clave para refrescar el balance acumulado y las cuentas inmediatamente
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['debtBalanceSummary'] }),
+        queryClient.invalidateQueries({ queryKey: ['settlementsHistory'] }),
+        queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+        queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] }),
+        queryClient.refetchQueries({ queryKey: ['debtBalanceSummary', coupleWorkspaceId || activeWorkspaceId] })
+      ]);
+
       setSuccessMsg('¡Pago de liquidación registrado con éxito!');
       setTimeout(() => {
         setModalOpen(false);
         setSuccessMsg(null);
-      }, 1800);
+      }, 1500);
     } catch (err: any) {
       console.error('Error al registrar liquidación:', err);
       setErrorMsg(err?.message || 'Error al conectar con el servidor');
     }
   };
+
+  const switchWorkspaceType = useWorkspaceStore((state) => state.switchWorkspaceType);
+  const setActiveWorkspace = useWorkspaceStore((state) => state.setActiveWorkspace);
 
   if (!isCoupleWorkspace) {
     return (
@@ -129,18 +234,42 @@ export default function SettlementPage() {
           <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
             <HeartHandshake className="w-8 h-8" />
           </div>
-          <h2 className="text-xl font-bold text-white">Requiere Espacio Compartido de Pareja</h2>
-          <p className="text-sm text-gray-400 max-w-md mx-auto">
-            Para ver el balance en tiempo real y saldar cuentas con tu pareja, vincula a tu pareja desde la configuración.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/settings"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all cursor-pointer shadow-lg"
-            >
-              <Sparkles className="w-4 h-4" /> Ir a Configuración & Vincular Pareja
-            </Link>
-          </div>
+          {coupleWs ? (
+            <>
+              <h2 className="text-xl font-bold text-white">Estás en tu Espacio Personal</h2>
+              <p className="text-sm text-gray-400 max-w-md mx-auto">
+                Las liquidaciones y saldos de gastos compartidos se gestionan en el <strong>Espacio Pareja</strong>.
+              </p>
+              <div className="pt-2">
+                <button
+                  onClick={() => {
+                    switchWorkspaceType('couple');
+                    if (coupleWs) {
+                      setActiveWorkspace(coupleWs.id, 'couple');
+                    }
+                  }}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all cursor-pointer shadow-lg"
+                >
+                  <HeartHandshake className="w-4 h-4" /> Cambiar a Espacio Pareja
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl font-bold text-white">Requiere Espacio Compartido de Pareja</h2>
+              <p className="text-sm text-gray-400 max-w-md mx-auto">
+                Para ver el balance en tiempo real y saldar cuentas con tu pareja, vincula a tu pareja desde la configuración.
+              </p>
+              <div className="pt-2">
+                <Link
+                  href="/settings"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all cursor-pointer shadow-lg"
+                >
+                  <Sparkles className="w-4 h-4" /> Ir a Configuración & Vincular Pareja
+                </Link>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -163,6 +292,36 @@ export default function SettlementPage() {
             Calculador automático de balance de gastos compartidos con <strong className="text-white">{otherPartnerName}</strong>.
           </p>
         </div>
+
+        {/* Configuración rápida de cuenta predeterminada */}
+        {availableAccounts.length > 0 && (
+          <div className="flex items-center gap-2 bg-gray-900/80 border border-gray-800 px-3.5 py-2 rounded-2xl shadow-sm">
+            <Wallet className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="flex flex-col text-left">
+              <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
+                Cuenta de liquidación
+              </span>
+              <select
+                value={defaultSettlementAccountId || (availableAccounts[0]?.id ?? '')}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (typeof setDefaultSettlementAccountId === 'function') {
+                    setDefaultSettlementAccountId(val);
+                  } else {
+                    useWorkspaceStore.setState({ defaultSettlementAccountId: val });
+                  }
+                }}
+                className="bg-transparent text-xs font-semibold text-white outline-none cursor-pointer hover:text-emerald-300 transition-colors"
+              >
+                {availableAccounts.map((acc) => (
+                  <option key={acc.id} value={acc.id} className="bg-gray-900 text-white">
+                    {acc.name} ({acc.currency || activeWs?.currency || 'PEN'})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Settlement Status Card */}
@@ -213,10 +372,15 @@ export default function SettlementPage() {
           <div className="w-full md:w-auto">
             <button
               onClick={openSettleModal}
-              className="w-full md:w-auto px-6 py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-gray-950 font-extrabold text-sm shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
+              disabled={netBalance <= 0}
+              className={`w-full md:w-auto px-6 py-3.5 rounded-2xl font-extrabold text-sm shadow-xl transition-all flex items-center justify-center gap-2 ${
+                netBalance > 0
+                  ? 'bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-gray-950 shadow-emerald-500/25 cursor-pointer'
+                  : 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-60 shadow-none'
+              }`}
             >
               <Send className="w-4 h-4" />
-              <span>Registrar Pago / Saldar</span>
+              <span>{netBalance > 0 ? 'Registrar Pago / Saldar' : 'Sin Deudas Pendientes'}</span>
             </button>
           </div>
         </div>
@@ -380,6 +544,48 @@ export default function SettlementPage() {
                   maxLength={100}
                 />
               </div>
+
+              {/* Selector de cuenta para imputar la liquidación */}
+              {availableAccounts.length > 0 && (
+                <div className="p-3.5 rounded-2xl bg-gray-950/80 border border-gray-800/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-gray-300 flex items-center gap-1.5">
+                      <Wallet className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{isUserCreditor ? 'Cuenta a la que se aportará / depositará:' : 'Cuenta de donde saldrá el pago:'}</span>
+                    </label>
+                    {defaultSettlementAccountId === selectedAccountId && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        Predeterminada
+                      </span>
+                    )}
+                  </div>
+
+                  <select
+                    value={selectedAccountId}
+                    onChange={(e) => setSelectedAccountId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-700/80 text-xs font-bold text-white outline-none focus:border-emerald-500 cursor-pointer"
+                  >
+                    {availableAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} ({acc.currency || activeWs?.currency || 'PEN'} - Saldo: {formatCurrency(acc.balance, acc.currency || activeWs?.currency || 'PEN')})
+                      </option>
+                    ))}
+                  </select>
+
+                  <div className="flex items-center gap-2 pt-0.5">
+                    <input
+                      type="checkbox"
+                      id="saveDefaultAccount"
+                      checked={saveAsDefaultAccount}
+                      onChange={(e) => setSaveAsDefaultAccount(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded text-emerald-500 bg-gray-900 border-gray-700 focus:ring-0 cursor-pointer"
+                    />
+                    <label htmlFor="saveDefaultAccount" className="text-[11px] text-gray-400 cursor-pointer select-none">
+                      Guardar como cuenta predeterminada para liquidaciones
+                    </label>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2 flex items-center gap-3">
                 <button
