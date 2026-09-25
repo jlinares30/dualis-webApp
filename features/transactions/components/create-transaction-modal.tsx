@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Receipt, Split, Sparkles, Wallet, PieChart, Percent, DollarSign } from 'lucide-react';
+import { X, Receipt, Split, Sparkles, Wallet, PieChart, Percent, DollarSign, User, Users } from 'lucide-react';
 import { useWorkspaceStore, DefaultSplitRule } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
-import { useCreateTransaction, useTransactions, useSplitRules } from '@/hooks';
+import { useCreateTransaction, useTransactions, useSplitRules, useCreateSplitRule, useUpdateSplitRule } from '@/hooks';
 import { useAccounts, useCreateAccount } from '@/hooks';
 import { useCategories, useCreateCategory } from '@/hooks';
 
@@ -64,6 +64,8 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
   const { mutateAsync: createCategory } = useCreateCategory();
   const { data: txPage } = useTransactions(0, 100);
   const { data: splitRules = [] } = useSplitRules();
+  const { mutateAsync: createSplitRuleMut } = useCreateSplitRule();
+  const { mutateAsync: updateSplitRuleMut } = useUpdateSplitRule();
 
   // Lista combinada de cuentas
   const availableAccounts = React.useMemo(() => {
@@ -117,11 +119,24 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
       let targetAccountId = selectedAccountId;
       let targetCategoryId = selectedCategoryId;
 
+      // Buscar la cuenta seleccionada en availableAccounts para determinar su workspaceId real
+      const selectedAccount = availableAccounts.find((a) => a.id === targetAccountId);
+
+      // Si el gasto no es compartido (100% asumido), se asigna al espacio personal.
+      // Si el gasto es compartido (isSplit = true), SIEMPRE se registra en el espacio de pareja (coupleWs)
+      // para que ambos miembros puedan verlo en el historial compartido, aun pagando con cuenta personal.
+      const effectiveWorkspaceId =
+        !isSplit && personalWs?.id
+          ? personalWs.id
+          : isSplit && coupleWs?.id
+            ? coupleWs.id
+            : activeWorkspaceId || personalWs?.id;
+
       // Autocrear cuenta si no existe
-      if (!targetAccountId && activeWorkspaceId) {
+      if (!targetAccountId && effectiveWorkspaceId) {
         try {
           const newAcc = await createAccount({
-            workspaceId: activeWorkspaceId,
+            workspaceId: effectiveWorkspaceId,
             name: 'Cuenta Principal',
             type: 'BANK',
             balance: 0,
@@ -134,10 +149,10 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
       }
 
       // Autocrear categoría si no existe
-      if (!targetCategoryId && activeWorkspaceId) {
+      if (!targetCategoryId && effectiveWorkspaceId) {
         try {
           const newCat = await createCategory({
-            workspaceId: activeWorkspaceId,
+            workspaceId: effectiveWorkspaceId,
             name: title || (type === 'income' ? 'Ingreso General' : 'Gasto General'),
             type: type === 'income' ? 'INCOME' : 'EXPENSE',
             categoryNature: 'ESSENTIAL',
@@ -148,16 +163,53 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
         }
       }
 
-      if (activeWorkspaceId && targetAccountId) {
+      if (effectiveWorkspaceId && targetAccountId) {
+        // Si el gasto es compartido, sincronizar la regla de división seleccionada en el modal
+        let activeSplitRuleId: string | undefined = undefined;
+        if (isSplit && coupleWs?.id) {
+          const ruleType: 'CUSTOM_PERCENTAGE' | 'EQUAL' = splitMode === 'PERCENTAGE' ? 'CUSTOM_PERCENTAGE' : 'EQUAL';
+          const partnerAPct = splitMode === 'PERCENTAGE' ? Number(userPercentage) : 50;
+          const partnerBPct = splitMode === 'PERCENTAGE' ? Number((100 - userPercentage).toFixed(2)) : 50;
+
+          try {
+            if (splitRules && splitRules.length > 0) {
+              const targetRule = splitRules[0];
+              await updateSplitRuleMut({
+                id: targetRule.id,
+                payload: {
+                  partnerAPercentage: partnerAPct,
+                  partnerBPercentage: partnerBPct,
+                  splitType: ruleType,
+                  isDefault: true,
+                },
+              });
+              activeSplitRuleId = targetRule.id;
+            } else {
+              const newRule = await createSplitRuleMut({
+                workspaceId: coupleWs.id,
+                name: splitMode === 'PERCENTAGE' ? `Porcentual (${partnerAPct}/${partnerBPct})` : 'Equitativo 50/50',
+                splitType: ruleType,
+                partnerAPercentage: partnerAPct,
+                partnerBPercentage: partnerBPct,
+                isDefault: true,
+              });
+              activeSplitRuleId = newRule.id;
+            }
+          } catch (ruleErr) {
+            console.error('Error al sincronizar regla de división:', ruleErr);
+          }
+        }
+
         await createTx({
-          workspaceId: activeWorkspaceId,
+          workspaceId: effectiveWorkspaceId,
           accountId: targetAccountId,
           categoryId: targetCategoryId || undefined,
           amount: parseFloat(amount),
-          currency: 'PEN',
+          currency: selectedAccount?.currency || 'PEN',
           type: type === 'income' ? 'INCOME' : 'EXPENSE',
           description: title || (type === 'income' ? 'Ingreso Registrado' : 'Gasto Registrado'),
           transactionDate: new Date().toISOString(),
+          splitRuleId: activeSplitRuleId,
         });
       }
 
@@ -377,18 +429,41 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
           {/* Split Checkbox & Expanded Advanced Options (Fase 2 - Parejas) */}
           {hasPartner && type === 'expense' && (
             <div className="space-y-3 pt-1 border-t border-gray-800/80">
-              <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-gray-900/80 border border-gray-800 cursor-pointer">
+              <label className="flex items-center gap-2.5 p-3 rounded-2xl bg-gray-900/80 border border-gray-800 cursor-pointer transition-colors hover:border-gray-700">
                 <input
                   type="checkbox"
                   checked={isSplit}
                   onChange={(e) => setIsSplit(e.target.checked)}
-                  className="rounded border-gray-700 bg-gray-800 text-emerald-500 focus:ring-0 w-4 h-4"
+                  className="rounded border-gray-700 bg-gray-800 text-emerald-500 focus:ring-0 w-4 h-4 cursor-pointer"
                 />
                 <div className="flex items-center justify-between flex-1">
                   <span className="text-xs text-gray-200 font-semibold">Dividir este gasto con mi pareja</span>
                   <Split className="w-4 h-4 text-emerald-400" />
                 </div>
               </label>
+
+              {/* Banner informativo de destino de la transacción */}
+              {!isSplit ? (
+                <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs animate-in fade-in">
+                  <User className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="font-semibold block text-amber-300">Gasto 100% individual</span>
+                    <p className="text-[11px] text-amber-200/80 mt-0.5">
+                      No se compartirá. Este movimiento se registrará directamente en tu lista de transacciones personales.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2.5 p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 text-xs animate-in fade-in">
+                  <Users className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
+                  <div>
+                    <span className="font-semibold block text-indigo-300">Gasto Compartido en Pareja</span>
+                    <p className="text-[11px] text-indigo-200/80 mt-0.5">
+                      Visible para ambos en el historial de pareja. Puedes pagarlo con tu cuenta personal o compartida.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {isSplit && (
                 <div className="p-4 rounded-2xl bg-indigo-950/30 border border-indigo-500/20 space-y-3 animate-in fade-in">

@@ -21,7 +21,7 @@ export function SummaryCards({ workspace, period }: SummaryCardsProps) {
   const isCouple = workspace === 'couple';
   const { activeWorkspaceId, workspaces } = useWorkspaceStore();
   const { user } = useAuthStore();
-  const { convert } = useExchangeRateStore();
+  const convert = useExchangeRateStore((s) => s.convert);
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
 
   const { data: summaryData, isLoading: isLoadingSummary } = useDashboardSummary();
@@ -50,24 +50,15 @@ export function SummaryCards({ workspace, period }: SummaryCardsProps) {
     if (!accountsList || accountsList.length === 0) {
       return summaryData?.totalBalance ?? summaryData?.totalLiquidity ?? 0;
     }
-    const result = accountsList.reduce((acc, account) => {
+    return accountsList.reduce((acc, account) => {
       const accCurr = (account.currency && account.currency.trim() ? account.currency : currency).toUpperCase();
       // Si la cuenta ya está en la misma moneda que el espacio, no se convierte
       if (accCurr === currency) {
         return acc + (account.balance || 0);
       }
-      const converted = convert(account.balance || 0, accCurr, currency);
-      return acc + converted;
+      return acc + convert(account.balance || 0, accCurr, currency);
     }, 0);
-    console.warn('[SummaryCards Debug]', {
-      workspaceCurrency: currency,
-      activeWsCurrency: activeWs?.currency,
-      userPreferredCurrency: user?.preferredCurrency,
-      accountsList,
-      result,
-    });
-    return result;
-  }, [accountsList, summaryData, currency, activeWs, user, convert]);
+  }, [accountsList, summaryData?.totalBalance, summaryData?.totalLiquidity, currency, convert]);
 
   const { monthlyIncome, monthlyExpenses, netSavings, savingsRate } = React.useMemo(() => {
     if (!txPage?.content || txPage.content.length === 0) {

@@ -172,7 +172,7 @@ export default function SubscriptionsPage() {
   };
 
   const [autoExecutedNotice, setAutoExecutedNotice] = useState<string | null>(null);
-  const { convert } = useExchangeRateStore();
+  const convert = useExchangeRateStore((s) => s.convert);
 
   // Ingresos recurrentes / fijos
   const [myIncomeInput, setMyIncomeInput] = useState<string>(userMonthlyIncome > 0 ? String(userMonthlyIncome) : '');

@@ -35,7 +35,7 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const { activeWorkspaceId, activeWorkspaceType, workspaces } = useWorkspaceStore();
   const { user } = useAuthStore();
-  const { convert } = useExchangeRateStore();
+  const convert = useExchangeRateStore((s) => s.convert);
 
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
   const baseCurrency = (activeWs?.currency || user?.preferredCurrency || 'PEN').toUpperCase();
@@ -68,41 +68,46 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
     return 'bank';
   };
 
-  const accounts: AccountItem[] = apiAccounts
-    ? apiAccounts
-        .filter((a) => a.status !== 'ARCHIVED')
-        .map((a) => ({
-          id: a.id,
-          name: a.name,
-          type: getAccountCategory(a.type || 'bank'),
-          balance: a.balance,
-          currency: (a.currency && a.currency.trim() ? a.currency : baseCurrency).toUpperCase(),
-          accountNumber: a.accountNumber,
-          color: a.color || getAccountColor(a.type || 'bank'),
-          workspace: (workspace as 'personal' | 'couple') || 'personal',
-        }))
-    : [];
+  const accounts: AccountItem[] = React.useMemo(() => {
+    if (!apiAccounts) return [];
+    return apiAccounts
+      .filter((a) => a.status !== 'ARCHIVED')
+      .map((a) => ({
+        id: a.id,
+        name: a.name,
+        type: getAccountCategory(a.type || 'bank'),
+        balance: a.balance,
+        currency: (a.currency && a.currency.trim() ? a.currency : baseCurrency).toUpperCase(),
+        accountNumber: a.accountNumber,
+        color: a.color || getAccountColor(a.type || 'bank'),
+        workspace: (workspace as 'personal' | 'couple') || 'personal',
+      }));
+  }, [apiAccounts, baseCurrency, workspace]);
 
-  // Total convertido a la moneda del espacio
-  const convertedTotalBalance = accounts.reduce((acc, curr) => {
-    if (curr.currency === baseCurrency) return acc + curr.balance;
-    return acc + convert(curr.balance, curr.currency, baseCurrency);
-  }, 0);
+  // Totales convertidos a la moneda del espacio memoizados
+  const { convertedTotalBalance, convertedDebitBalance, convertedCreditBalance } = React.useMemo(() => {
+    let total = 0;
+    let debit = 0;
+    let credit = 0;
 
-  const convertedDebitBalance = accounts
-    .filter((a) => a.balance > 0)
-    .reduce((acc, curr) => {
-      if (curr.currency === baseCurrency) return acc + curr.balance;
-      return acc + convert(curr.balance, curr.currency, baseCurrency);
-    }, 0);
+    accounts.forEach((curr) => {
+      const converted = curr.currency === baseCurrency ? curr.balance : convert(curr.balance, curr.currency, baseCurrency);
+      total += converted;
 
-  const convertedCreditBalance = accounts
-    .filter((a) => a.balance < 0)
-    .reduce((acc, curr) => {
-      const positiveAmt = Math.abs(curr.balance);
-      if (curr.currency === baseCurrency) return acc + positiveAmt;
-      return acc + convert(positiveAmt, curr.currency, baseCurrency);
-    }, 0);
+      if (curr.balance > 0) {
+        debit += converted;
+      } else if (curr.balance < 0) {
+        const positiveAmt = Math.abs(curr.balance);
+        credit += curr.currency === baseCurrency ? positiveAmt : convert(positiveAmt, curr.currency, baseCurrency);
+      }
+    });
+
+    return {
+      convertedTotalBalance: total,
+      convertedDebitBalance: debit,
+      convertedCreditBalance: credit,
+    };
+  }, [accounts, baseCurrency, convert]);
 
   // Desglose por moneda
   const currencyBreakdown = React.useMemo(() => {

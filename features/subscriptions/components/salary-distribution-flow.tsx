@@ -121,7 +121,7 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
     ...coupleInvestments.map((inv) => ({ ...inv, workspaceType: 'COUPLE' as const, groupLabel: '👥 Inversiones de Pareja' })),
   ];
 
-  const { convert, rates } = useExchangeRateStore();
+  const convert = useExchangeRateStore((s) => s.convert);
 
   // Calcular montos de cada rama y su conversión a la moneda del destino (cuenta o inversión)
   const calculatedBranches = localConfig.branches.map((b) => {

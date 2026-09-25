@@ -233,13 +233,23 @@ export default function SettlementPage() {
             <div className="p-3 rounded-2xl bg-gray-950/40 border border-gray-800/50">
               <span className="block text-[10px] text-gray-400 font-semibold uppercase">Tus Aportes</span>
               <span className="text-sm font-bold text-indigo-400 mt-0.5 block">
-                {formatCurrency(balanceSummary.partnerAPaidTotal, activeWs?.currency || 'PEN')}
+                {formatCurrency(
+                  balanceSummary.partnerAEmail && currentUserEmail.toLowerCase() === balanceSummary.partnerAEmail.toLowerCase()
+                    ? balanceSummary.partnerAPaidTotal
+                    : balanceSummary.partnerBPaidTotal,
+                  activeWs?.currency || 'PEN'
+                )}
               </span>
             </div>
             <div className="p-3 rounded-2xl bg-gray-950/40 border border-gray-800/50 col-span-2 sm:col-span-1">
               <span className="block text-[10px] text-gray-400 font-semibold uppercase">Aportes de {otherPartnerName}</span>
               <span className="text-sm font-bold text-purple-400 mt-0.5 block">
-                {formatCurrency(balanceSummary.partnerBPaidTotal, activeWs?.currency || 'PEN')}
+                {formatCurrency(
+                  balanceSummary.partnerAEmail && currentUserEmail.toLowerCase() === balanceSummary.partnerAEmail.toLowerCase()
+                    ? balanceSummary.partnerBPaidTotal
+                    : balanceSummary.partnerAPaidTotal,
+                  activeWs?.currency || 'PEN'
+                )}
               </span>
             </div>
           </div>
