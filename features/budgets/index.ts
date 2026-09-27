@@ -10,3 +10,4 @@ export * from './hooks/useBudgets';
 // Components
 export * from './components/budget-widget';
 export * from './components/create-budget-modal';
+export * from './components/edit-budget-modal';

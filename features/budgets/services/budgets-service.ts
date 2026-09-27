@@ -20,9 +20,9 @@ export async function getBudgets(workspaceId?: string, month?: number, year?: nu
           name: b.name,
           categoryId: b.categoryId,
           categoryName: progress.name || b.name,
-          limitAmount: b.amount || progress.limitAmount || 0,
+          limitAmount: progress.limitAmount || b.amount || 0,
           spentAmount: progress.spentAmount ?? 0,
-          currency: b.currency || progress.currency || 'PEN',
+          currency: progress.currency || b.currency || 'PEN',
           workspaceId: b.workspaceId,
         };
       } catch {
@@ -59,6 +59,13 @@ export async function createBudget(data: CreateBudgetRequest): Promise<BudgetDTO
   return apiFetch<BudgetDTO>('/budgets', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export async function updateBudget(id: string, data: Partial<CreateBudgetRequest>): Promise<BudgetDTO> {
+  return apiFetch<BudgetDTO>(`/budgets/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
   });
 }
 

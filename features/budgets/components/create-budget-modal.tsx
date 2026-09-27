@@ -12,6 +12,10 @@ interface CreateBudgetModalProps {
 export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
   const { mutateAsync: createBudget, isPending } = useCreateBudget();
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const workspaceCurrency = activeWs?.currency || 'PEN';
+  const currencySymbol = workspaceCurrency === 'USD' ? '$' : workspaceCurrency === 'EUR' ? '€' : 'S/';
 
   const { data: categoriesData } = useCategories('EXPENSE');
   const { mutateAsync: createCategory } = useCreateCategory();
@@ -56,7 +60,7 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
         categoryId: targetCategoryId || undefined,
         amount: parseFloat(limit) || 0,
         limitAmount: parseFloat(limit) || 0,
-        currency: 'PEN',
+        currency: workspaceCurrency,
       });
       setName('');
       setLimit('');
@@ -121,7 +125,9 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1">Límite Máximo (S/ PEN)</label>
+              <label className="block text-xs font-semibold text-gray-300 mb-1">
+                Límite Máximo ({currencySymbol} {workspaceCurrency})
+              </label>
               <input
                 type="number"
                 value={limit}

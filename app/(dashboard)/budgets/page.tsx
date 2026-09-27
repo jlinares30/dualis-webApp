@@ -9,14 +9,27 @@ import {
   AlertCircle, 
   Sparkles,
   TrendingUp,
-  Target
+  Target,
+  Pencil,
+  Trash2,
+  X
 } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
-import { useBudgets, CreateBudgetModal, BudgetCategory } from '@/features/budgets';
+import { useBudgets, useDeleteBudget, CreateBudgetModal, EditBudgetModal, BudgetCategory, BudgetDTO } from '@/features/budgets';
+import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
 export default function BudgetsPage() {
   const { data: apiBudgets, isLoading } = useBudgets();
+  const { mutateAsync: deleteBudgetMut, isPending: isDeleting } = useDeleteBudget();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<BudgetDTO | null>(null);
+  const [deletingBudgetId, setDeletingBudgetId] = useState<string | null>(null);
+
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const workspaces = useWorkspaceStore((state) => state.workspaces);
+  const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
+  const workspaceCurrency = activeWs?.currency || 'PEN';
 
   const budgets: BudgetCategory[] = apiBudgets
     ? apiBudgets.map((b) => ({
@@ -25,7 +38,7 @@ export default function BudgetsPage() {
         category: (b.categoryName?.toLowerCase() as any) || 'food',
         spent: b.spentAmount || 0,
         limit: b.limitAmount || 1000,
-        currency: b.currency || 'PEN',
+        currency: workspaceCurrency || b.currency || 'PEN',
       }))
     : [];
 
@@ -76,8 +89,8 @@ export default function BudgetsPage() {
           <div>
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Consumo Global</span>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className="text-3xl font-extrabold text-white">{formatCurrency(totalSpent, 'PEN')}</span>
-              <span className="text-sm text-gray-400 font-medium">de {formatCurrency(totalLimit, 'PEN')} límite global</span>
+              <span className="text-3xl font-extrabold text-white">{formatCurrency(totalSpent, workspaceCurrency)}</span>
+              <span className="text-sm text-gray-400 font-medium">de {formatCurrency(totalLimit, workspaceCurrency)} límite global</span>
             </div>
           </div>
 
@@ -126,16 +139,49 @@ export default function BudgetsPage() {
             const status = getStatus(b.spent, b.limit);
             const StatusIcon = status.icon;
 
+            const fullBudget = (apiBudgets || []).find((raw) => raw.id === b.id) || {
+              id: b.id,
+              name: b.name,
+              limitAmount: b.limit,
+              spentAmount: b.spent,
+              currency: workspaceCurrency || b.currency,
+            };
+
             return (
               <div
                 key={b.id}
-                className="rounded-2xl bg-[#0f172a]/90 border border-gray-800/80 p-5 shadow-lg space-y-4 hover:border-gray-700 transition-all"
+                className="rounded-2xl bg-[#0f172a]/90 border border-gray-800/80 p-5 shadow-lg space-y-4 hover:border-gray-700 transition-all group"
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-base text-white">{b.name}</h3>
-                  <div className={cn('flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border', status.badge)}>
-                    <StatusIcon className="w-3.5 h-3.5" />
-                    <span>{status.text}</span>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-base text-white">{b.name}</h3>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className={cn('flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border', status.badge)}>
+                      <StatusIcon className="w-3.5 h-3.5" />
+                      <span>{status.text}</span>
+                    </div>
+
+                    {/* Botones de Acción: Editar y Eliminar */}
+                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => setEditingBudget(fullBudget)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
+                        title="Editar presupuesto"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeletingBudgetId(b.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                        title="Eliminar presupuesto"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -163,11 +209,69 @@ export default function BudgetsPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal Crear */}
       <CreateBudgetModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
+
+      {/* Modal Editar */}
+      <EditBudgetModal
+        isOpen={Boolean(editingBudget)}
+        onClose={() => setEditingBudget(null)}
+        budget={editingBudget}
+      />
+
+      {/* Modal Confirmar Eliminación */}
+      {deletingBudgetId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in-50">
+          <div className="relative w-full max-w-sm bg-[#0f172a] border border-gray-800 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-white">Eliminar Presupuesto</h3>
+                <p className="text-xs text-gray-400">¿Estás seguro de continuar?</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-300 leading-relaxed">
+              Esta acción eliminará el tope de gasto de esta categoría. Tus transacciones pasadas permanecerán intactas.
+            </p>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingBudgetId(null)}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 rounded-xl bg-gray-800 text-gray-300 hover:bg-gray-700 font-medium text-xs transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await deleteBudgetMut(deletingBudgetId);
+                    setDeletingBudgetId(null);
+                  } catch (err) {
+                    console.error('Error al eliminar presupuesto:', err);
+                  }
+                }}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-colors shadow-lg shadow-rose-600/30 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  'Eliminar'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

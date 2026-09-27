@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getBudgets, createBudget, deleteBudget, CreateBudgetRequest } from '@/lib/services';
+import { getBudgets, createBudget, updateBudget, deleteBudget, CreateBudgetRequest } from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
@@ -22,6 +22,19 @@ export function useCreateBudget() {
 
   return useMutation({
     mutationFn: (newBudget: CreateBudgetRequest) => createBudget(newBudget),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+}
+
+export function useUpdateBudget() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<CreateBudgetRequest> }) =>
+      updateBudget(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['budgets'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });

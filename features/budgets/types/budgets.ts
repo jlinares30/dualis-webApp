@@ -25,6 +25,14 @@ export interface CreateBudgetRequest {
   periodYear?: number;
 }
 
+export interface UpdateBudgetRequest {
+  name?: string;
+  categoryId?: string;
+  amount?: number;
+  limitAmount?: number;
+  currency?: string;
+}
+
 export interface BudgetCategory {
   id: string;
   name: string;
