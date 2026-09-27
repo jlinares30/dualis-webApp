@@ -20,3 +20,12 @@ export interface CreateGoalRequest {
   category?: 'EMERGENCY' | 'TRAVEL' | 'HOUSE' | 'CAR' | 'TECH' | 'OTHER';
   currency?: string;
 }
+
+export interface UpdateGoalRequest {
+  name?: string;
+  targetAmount?: number;
+  currentAmount?: number;
+  deadlineDate?: string;
+  category?: 'EMERGENCY' | 'TRAVEL' | 'HOUSE' | 'CAR' | 'TECH' | 'OTHER';
+  currency?: string;
+}

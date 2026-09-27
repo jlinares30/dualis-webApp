@@ -24,6 +24,13 @@ export async function depositToGoal(goalId: string, amount: number): Promise<Sav
   });
 }
 
+export async function updateGoal(goalId: string, request: Partial<CreateGoalRequest>): Promise<SavingsGoalDTO> {
+  return apiFetch<SavingsGoalDTO>(`/goals/${goalId}`, {
+    method: 'PUT',
+    body: JSON.stringify(request),
+  });
+}
+
 export async function deleteGoal(goalId: string): Promise<void> {
   return apiFetch<void>(`/goals/${goalId}`, {
     method: 'DELETE',

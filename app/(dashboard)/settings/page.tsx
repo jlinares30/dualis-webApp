@@ -37,6 +37,7 @@ import { useUpdateUserProfile } from '@/features/auth';
 import { useInviteCode, useJoinWorkspace, useUnlinkPartner, useUpdateWorkspace, useCreateWorkspace } from '@/features/workspaces';
 import { useCreateSplitRule } from '@/features/transactions';
 import { getDebtBalanceSummary } from '@/features/settlements';
+import { getBudgets, updateBudget, BudgetDTO } from '@/features/budgets';
 import { formatCurrency, capitalize } from '@/lib/utils';
 
 export default function SettingsPage() {
@@ -57,6 +58,7 @@ export default function SettingsPage() {
     setRate,
     fetchLiveRates,
     resetToDefaults,
+    convert,
   } = useExchangeRateStore();
 
   const [newCurrencyCode, setNewCurrencyCode] = useState('');
@@ -128,6 +130,17 @@ export default function SettingsPage() {
   const [showUnlinkModal, setShowUnlinkModal] = useState(false);
   const [isCheckingBalance, setIsCheckingBalance] = useState(false);
   const [closingSnapshot, setClosingSnapshot] = useState<ClosedWorkspaceSnapshot | null>(null);
+
+  // Modal de Confirmación de Cambio de Moneda y Migración de Presupuestos
+  const [showCurrencyModal, setShowCurrencyModal] = useState(false);
+  const [pendingCurrencyData, setPendingCurrencyData] = useState<{
+    targetScope: 'personal' | 'couple';
+    newCurrency: string;
+    oldCurrency: string;
+    workspaceId: string;
+  } | null>(null);
+  const [affectedBudgets, setAffectedBudgets] = useState<BudgetDTO[]>([]);
+  const [isMigratingBudgets, setIsMigratingBudgets] = useState(false);
 
   const effectiveCoupleWs = coupleWs || workspaces.find((w) => w.id === activeWorkspaceId && (w.type === 'COUPLE' || (w.type as any) === 'couple'));
   const isCoupleFullyJoined = Boolean(
@@ -291,8 +304,9 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeSaveSettings = async (
+    convertedBudgetsMode?: 'CONVERT_RATE' | 'KEEP_AMOUNT' | null
+  ) => {
     try {
       await updateProfile({
         fullName,
@@ -324,6 +338,32 @@ export default function SettingsPage() {
         } catch (cwErr) {
           console.error('Error al actualizar moneda en workspace de pareja:', cwErr);
         }
+      }
+
+      // Si se confirmaron presupuestos para migrar
+      if (convertedBudgetsMode && pendingCurrencyData && affectedBudgets.length > 0) {
+        setIsMigratingBudgets(true);
+        const { oldCurrency, newCurrency } = pendingCurrencyData;
+
+        // Migrar presupuestos
+        for (const b of affectedBudgets) {
+          try {
+            let newAmount = b.limitAmount;
+            if (convertedBudgetsMode === 'CONVERT_RATE') {
+              const converted = convert(b.limitAmount, oldCurrency, newCurrency);
+              newAmount = parseFloat(converted.toFixed(2));
+            }
+            await updateBudget(b.id, {
+              amount: newAmount,
+              limitAmount: newAmount,
+              currency: newCurrency,
+            });
+          } catch (migrErr) {
+            console.error(`Error al migrar presupuesto ${b.id} a ${newCurrency}:`, migrErr);
+          }
+        }
+
+        setIsMigratingBudgets(false);
       }
 
       if (activeWorkspaceId) {
@@ -366,15 +406,62 @@ export default function SettingsPage() {
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['debtBalanceSummary'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['goals'] });
+
+      setShowCurrencyModal(false);
+      setPendingCurrencyData(null);
+      setAffectedBudgets([]);
 
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
       console.error('Error al actualizar perfil:', err);
       setDefaultSplitRule(selectedRule, userPct);
+      setIsMigratingBudgets(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const personalWs = workspaces.find((w) => w.type === 'INDIVIDUAL' || (w.type as any) === 'personal');
+    const oldPersonalCurrency = personalWs?.currency || user?.preferredCurrency || 'PEN';
+    const oldCoupleCurrency = coupleWs?.currency || 'PEN';
+
+    const personalChanged = personalWs?.id && currency !== oldPersonalCurrency;
+    const coupleChanged = coupleWs?.id && coupleCurrency !== oldCoupleCurrency;
+
+    // Si cambió la moneda de algún espacio, verificar si existen presupuestos
+    if (personalChanged || coupleChanged) {
+      const targetScope = personalChanged ? 'personal' : 'couple';
+      const wsId = personalChanged ? personalWs!.id : coupleWs!.id;
+      const oldCurr = personalChanged ? oldPersonalCurrency : oldCoupleCurrency;
+      const newCurr = personalChanged ? currency : coupleCurrency;
+
+      try {
+        const existingBudgets = await getBudgets(wsId);
+        const hasBudgets = existingBudgets && existingBudgets.length > 0;
+
+        if (hasBudgets) {
+          setPendingCurrencyData({
+            targetScope,
+            newCurrency: newCurr,
+            oldCurrency: oldCurr,
+            workspaceId: wsId,
+          });
+          setAffectedBudgets(existingBudgets || []);
+          setShowCurrencyModal(true);
+          return;
+        }
+      } catch (checkErr) {
+        console.warn('No se pudieron precargar presupuestos:', checkErr);
+      }
+    }
+
+    await executeSaveSettings(null);
   };
 
   return (
@@ -1152,6 +1239,133 @@ export default function SettingsPage() {
                     <span>Confirmar y Desvincular</span>
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Confirmación de Cambio de Moneda y Migración de Presupuestos */}
+      {showCurrencyModal && pendingCurrencyData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in-50">
+          <div className="relative w-full max-w-lg bg-[#0f172a] border border-gray-800 rounded-3xl p-6 shadow-2xl space-y-4">
+            <button
+              onClick={() => {
+                setShowCurrencyModal(false);
+                setPendingCurrencyData(null);
+                setAffectedBudgets([]);
+              }}
+              disabled={isMigratingBudgets}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                <Coins className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-white">Cambio de Moneda Base</h3>
+                <p className="text-xs text-gray-400">
+                  {pendingCurrencyData.targetScope === 'personal'
+                    ? 'Espacio Personal'
+                    : 'Espacio Compartido de Pareja'}{' '}
+                  • De {pendingCurrencyData.oldCurrency} a {pendingCurrencyData.newCurrency}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              <p className="text-xs text-gray-300 leading-relaxed">
+                Tienes{' '}
+                <strong>{affectedBudgets.length} presupuesto(s)</strong> en este espacio.
+                Los nuevos presupuestos se crearán en <strong>{pendingCurrencyData.newCurrency}</strong>.
+                Tus metas de ahorro y cuentas bancarias mantendrán de forma intacta su propia moneda configurada.
+                ¿Cómo deseas proceder con los presupuestos existentes?
+              </p>
+
+              {/* Lista breve de elementos afectados */}
+              <div className="max-h-44 overflow-y-auto space-y-2 p-3 rounded-2xl bg-gray-900/80 border border-gray-800/80 divide-y divide-gray-800/50">
+                {affectedBudgets.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between text-xs pt-1.5 first:pt-0">
+                    <span className="text-gray-300 font-medium truncate max-w-[190px]">
+                      📊 {b.name || b.categoryName || 'Presupuesto'}
+                    </span>
+                    <span className="text-gray-400 font-mono text-[11px]">
+                      {formatCurrency(b.limitAmount, pendingCurrencyData.oldCurrency)}
+                      <span className="text-indigo-400 mx-1">➔</span>
+                      {formatCurrency(
+                        convert(b.limitAmount, pendingCurrencyData.oldCurrency, pendingCurrencyData.newCurrency),
+                        pendingCurrencyData.newCurrency
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Las 2 Opciones Disponibles */}
+              <div className="space-y-2.5 pt-2">
+                <button
+                  type="button"
+                  disabled={isMigratingBudgets}
+                  onClick={() => executeSaveSettings('CONVERT_RATE')}
+                  className="w-full text-left p-3.5 rounded-2xl bg-indigo-600/15 border border-indigo-500/30 hover:bg-indigo-600/25 hover:border-indigo-500/50 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-indigo-300 group-hover:text-white flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      Opción 1: Convertir montos con Tipo de Cambio (Recomendado)
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-medium">
+                      Automático
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 leading-snug">
+                    Recalcula los límites de gastos para mantener el valor adquisitivo equivalente en {pendingCurrencyData.newCurrency} según la tasa actual.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isMigratingBudgets}
+                  onClick={() => executeSaveSettings('KEEP_AMOUNT')}
+                  className="w-full text-left p-3.5 rounded-2xl bg-gray-900/90 border border-gray-800 hover:border-gray-700 transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-gray-200 group-hover:text-white">
+                      Opción 2: Mantener valores numéricos
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-800 text-gray-400 font-medium">
+                      Manual
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400 leading-snug">
+                    Conserva el número exacto del límite (ej. 1,000 {pendingCurrencyData.oldCurrency} pasa a 1,000 {pendingCurrencyData.newCurrency}) y te permite ajustarlo manualmente en Presupuestos.
+                  </p>
+                </button>
+              </div>
+
+              {isMigratingBudgets && (
+                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs flex items-center gap-2">
+                  <RefreshCw className="w-4 h-4 animate-spin text-blue-400" />
+                  <span>Actualizando presupuestos a {pendingCurrencyData.newCurrency}...</span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-800/80">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCurrencyModal(false);
+                  setPendingCurrencyData(null);
+                  setAffectedBudgets([]);
+                }}
+                disabled={isMigratingBudgets}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition-all cursor-pointer"
+              >
+                Cancelar
               </button>
             </div>
           </div>
