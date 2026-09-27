@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   getInvestments, 
   createInvestment, 
+  updateInvestment,
   deleteInvestment, 
   CreateInvestmentRequest, 
   InvestmentDTO 
@@ -28,6 +29,19 @@ export function useCreateInvestment() {
 
   return useMutation({
     mutationFn: (newInv: CreateInvestmentRequest) => createInvestment(newInv),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investments'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+  });
+}
+
+export function useUpdateInvestment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => updateInvestment(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investments'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });

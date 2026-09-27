@@ -10,25 +10,148 @@ import {
   PieChart, 
   ShieldCheck, 
   Layers, 
-  Coins 
+  Coins,
+  Pencil,
+  Trash2,
+  X,
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useInvestments, CreateInvestmentModal } from '@/features/investments';
+import { useInvestments, useUpdateInvestment, useDeleteInvestment, CreateInvestmentModal, InvestmentDTO } from '@/features/investments';
+import { useAccounts, useCreateTransaction } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
+
+const COMMON_CURRENCIES = ['PEN', 'USD', 'EUR', 'COP', 'MXN', 'CLP', 'ARS', 'BRL'];
+
+const getCurrencySymbol = (curr: string) => {
+  return curr === 'USD' ? '$' : curr === 'EUR' ? '€' : curr === 'PEN' ? 'S/' : curr;
+};
 
 export default function InvestmentsPage() {
   const { activeWorkspaceId, workspaces } = useWorkspaceStore();
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
   const currency = activeWs?.currency || 'PEN';
+  const { convert } = useExchangeRateStore();
   const { data: apiInvestments, isLoading } = useInvestments();
+  const { data: apiAccounts } = useAccounts();
+  const { mutateAsync: updateInvMut, isPending: isUpdating } = useUpdateInvestment();
+  const { mutateAsync: deleteInvMut, isPending: isDeleting } = useDeleteInvestment();
+  const { mutateAsync: createTxMut } = useCreateTransaction();
+
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Estado para Actualizar Valorización / Editar
+  const [editingInv, setEditingInv] = useState<InvestmentDTO | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editInstitution, setEditInstitution] = useState('');
+  const [editCurrentValue, setEditCurrentValue] = useState('');
+  const [editInitialCapital, setEditInitialCapital] = useState('');
+  const [editCurrency, setEditCurrency] = useState('PEN');
+
+  // Estado para Confirmación y Liquidación de Inversión
+  const liquidAccounts = (apiAccounts || []).filter(
+    (a) => a.status !== 'ARCHIVED' && a.type?.toUpperCase() !== 'INVESTMENT'
+  );
+  const [deletingInv, setDeletingInv] = useState<InvestmentDTO | null>(null);
+  const [depositToAccountOnDelete, setDepositToAccountOnDelete] = useState(false);
+  const [destinationAccountId, setDestinationAccountId] = useState('');
 
   const investments = apiInvestments || [];
 
-  const totalCapital = investments.reduce((acc, curr) => acc + (curr.initialCapital || 0), 0);
-  const totalValue = investments.reduce((acc, curr) => acc + (curr.currentValue || curr.initialCapital || 0), 0);
+  // Convertir cada activo a la moneda base del espacio para calcular totales consolidados correctos
+  const totalCapital = investments.reduce((acc, curr) => {
+    const invCurrency = curr.currency || currency;
+    const converted = convert(curr.initialCapital || 0, invCurrency, currency);
+    return acc + converted;
+  }, 0);
+
+  const totalValue = investments.reduce((acc, curr) => {
+    const invCurrency = curr.currency || currency;
+    const rawVal = curr.currentValue ?? curr.initialCapital ?? 0;
+    const converted = convert(rawVal, invCurrency, currency);
+    return acc + converted;
+  }, 0);
+
   const totalReturns = totalValue - totalCapital;
   const overallRoi = totalCapital > 0 ? (totalReturns / totalCapital) * 100 : 0;
+
+  const handleOpenEdit = (inv: InvestmentDTO) => {
+    setEditingInv(inv);
+    setEditName(inv.name);
+    setEditInstitution(inv.institution || '');
+    setEditCurrentValue((inv.currentValue ?? inv.initialCapital ?? 0).toString());
+    setEditInitialCapital((inv.initialCapital ?? 0).toString());
+    setEditCurrency(inv.currency || currency);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingInv || !editName) return;
+
+    try {
+      await updateInvMut({
+        id: editingInv.id,
+        data: {
+          name: editName,
+          institution: editInstitution || 'Entidad Financiera',
+          initialCapital: parseFloat(editInitialCapital) || 0,
+          currentValue: parseFloat(editCurrentValue) || 0,
+        },
+      });
+      setEditingInv(null);
+    } catch (err) {
+      console.error('Error al actualizar inversión:', err);
+    }
+  };
+
+  const handleOpenDelete = (inv: InvestmentDTO) => {
+    setDeletingInv(inv);
+    // Sugerir cuenta que coincida con la moneda de la inversión
+    const matching = liquidAccounts.find((a) => a.currency === inv.currency);
+    setDestinationAccountId(matching ? matching.id : liquidAccounts[0]?.id || '');
+    setDepositToAccountOnDelete(false);
+  };
+
+  const handleDelete = async () => {
+    if (!deletingInv) return;
+    try {
+      const invCurrentVal = deletingInv.currentValue ?? deletingInv.initialCapital ?? 0;
+      const targetAccount = liquidAccounts.find((a) => a.id === destinationAccountId);
+
+      // Si el usuario eligió liquidar y depositar los fondos en una cuenta bancaria
+      if (depositToAccountOnDelete && targetAccount && invCurrentVal > 0) {
+        const invCurr = deletingInv.currency || currency;
+        const targetCurr = targetAccount.currency || currency;
+        let depositVal = invCurrentVal;
+        if (targetCurr !== invCurr) {
+          depositVal = parseFloat(convert(invCurrentVal, invCurr, targetCurr).toFixed(2));
+        }
+
+        try {
+          await createTxMut({
+            workspaceId: targetAccount.workspaceId || activeWorkspaceId!,
+            accountId: targetAccount.id,
+            amount: depositVal,
+            currency: targetCurr,
+            type: 'INCOME',
+            categoryNature: 'INVESTMENT',
+            description: `Liquidación de inversión: ${deletingInv.name} (${deletingInv.institution || 'Portafolio'})`,
+            transactionDate: new Date().toISOString(),
+          });
+        } catch (txErr) {
+          console.error('Error al registrar transacción de rescate/liquidación:', txErr);
+        }
+      }
+
+      await deleteInvMut(deletingInv.id);
+      setDeletingInv(null);
+    } catch (err) {
+      console.error('Error al eliminar inversión:', err);
+    }
+  };
+
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -116,46 +239,73 @@ export default function InvestmentsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {investments.map((inv) => {
+            const invCurrency = inv.currency || currency;
             const capital = inv.initialCapital || 0;
-            const current = inv.currentValue || capital;
+            const current = inv.currentValue ?? capital;
             const gain = current - capital;
             const roi = capital > 0 ? (gain / capital) * 100 : 0;
 
             return (
               <div
                 key={inv.id}
-                className="relative overflow-hidden rounded-2xl bg-[#0f172a]/90 border border-gray-800/80 p-5 shadow-lg hover:border-gray-700 transition-all duration-200 group"
+                className="relative overflow-hidden rounded-2xl bg-[#0f172a]/90 border border-gray-800/80 p-5 shadow-lg hover:border-gray-700 transition-all duration-200 group flex flex-col justify-between"
               >
-                <div className="flex items-center justify-between mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-md">
-                    <TrendingUp className="w-5 h-5" />
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-md">
+                        <TrendingUp className="w-5 h-5" />
+                      </div>
+                      <span className="text-[10px] font-semibold uppercase px-2.5 py-0.5 rounded-full bg-gray-800 text-gray-300 border border-gray-700">
+                        {inv.type}
+                      </span>
+                      <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+                        {invCurrency}
+                      </span>
+                    </div>
+
+                    {/* Botones de Acción: Editar/Actualizar y Eliminar */}
+                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEdit(inv)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
+                        title="Actualizar valorización"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenDelete(inv)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                        title="Eliminar o liquidar inversión"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
-                  <span className="text-[10px] font-semibold uppercase px-2.5 py-1 rounded-full bg-gray-800 text-gray-300 border border-gray-700">
-                    {inv.type}
-                  </span>
-                </div>
-
-                <div className="space-y-1 mb-4">
-                  <h3 className="font-bold text-base text-white group-hover:text-emerald-400 transition-colors">
-                    {inv.name}
-                  </h3>
-                  <p className="text-xs text-gray-500">
-                    {inv.institution || 'Entidad Financiera'}
-                  </p>
+                  <div className="space-y-1 mb-4">
+                    <h3 className="font-bold text-base text-white group-hover:text-emerald-400 transition-colors truncate">
+                      {inv.name}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {inv.institution || 'Entidad Financiera'}
+                    </p>
+                  </div>
                 </div>
 
                 <div className="pt-3 border-t border-gray-800/80 space-y-1.5">
                   <div className="flex justify-between items-baseline text-xs">
                     <span className="text-gray-400">Valor Actual</span>
-                    <span className="font-bold text-base text-white">
-                      {formatCurrency(current, inv.currency || currency)}
+                    <span className="font-bold text-base text-white font-mono">
+                      {formatCurrency(current, invCurrency)}
                     </span>
                   </div>
                   <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-gray-500">Capital: {formatCurrency(capital, inv.currency || currency)}</span>
-                    <span className={`font-semibold ${gain >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                      {gain >= 0 ? '+' : ''}{gain.toFixed(2)} ({roi.toFixed(1)}%)
+                    <span className="text-gray-500">Capital: {formatCurrency(capital, invCurrency)}</span>
+                    <span className={`font-semibold font-mono ${gain >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      {gain >= 0 ? '+' : ''}{formatCurrency(gain, invCurrency)} ({roi.toFixed(1)}%)
                     </span>
                   </div>
                 </div>
@@ -165,11 +315,206 @@ export default function InvestmentsPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal Crear */}
       <CreateInvestmentModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
+
+      {/* Modal Actualizar Valorización / Editar */}
+      {editingInv && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in-50">
+          <div className="relative w-full max-w-md bg-[#0f172a] border border-gray-800 rounded-3xl p-6 shadow-2xl space-y-4">
+            <button
+              onClick={() => setEditingInv(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                <Pencil className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-lg text-white">Actualizar Inversión</h3>
+                <p className="text-xs text-gray-400">Ajusta el valor de mercado o capital invertido</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdate} className="space-y-3.5 pt-2">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">Nombre</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-emerald-500"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">Plataforma / Banco</label>
+                  <input
+                    type="text"
+                    value={editInstitution}
+                    onChange={(e) => setEditInstitution(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">Moneda del Activo</label>
+                  <div className="w-full px-3.5 py-2.5 rounded-xl bg-gray-950 border border-gray-800 text-xs text-gray-300 font-mono font-semibold flex items-center justify-between cursor-not-allowed select-none">
+                    <span>{editCurrency} ({getCurrencySymbol(editCurrency)})</span>
+                    <span className="text-[10px] text-gray-500 font-sans font-normal">Fija</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">
+                    Capital Invertido ({getCurrencySymbol(editCurrency)})
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editInitialCapital}
+                    onChange={(e) => setEditInitialCapital(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-emerald-500 font-mono"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">
+                    Valor Actual ({getCurrencySymbol(editCurrency)})
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={editCurrentValue}
+                    onChange={(e) => setEditCurrentValue(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-emerald-500 font-mono font-bold"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setEditingInv(null)}
+                  className="flex-1 py-2.5 rounded-xl bg-gray-800 text-gray-300 hover:bg-gray-700 font-medium text-xs transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdating}
+                  className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors shadow-lg shadow-emerald-600/30 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isUpdating ? 'Guardando...' : 'Guardar Cambios'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmación y Liquidación de Inversión */}
+      {deletingInv && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in-50">
+          <div className="relative w-full max-w-md bg-[#0f172a] border border-gray-800 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-bold text-base text-white">Retirar o Liquidar Inversión</h3>
+                <p className="text-xs text-gray-400">
+                  {deletingInv.name} ({formatCurrency(deletingInv.currentValue ?? deletingInv.initialCapital ?? 0, deletingInv.currency || currency)})
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-gray-400 text-left">
+              ¿Deseas cerrar esta inversión? Puedes transferir el valor liquidado directamente a una de tus cuentas bancarias como ingreso, o simplemente darla de baja del portafolio.
+            </p>
+
+            {/* Opción de depositar fondos en cuenta bancaria */}
+            <div className="p-3.5 rounded-2xl bg-gray-900 border border-gray-800 space-y-2 text-left">
+              <label className="flex items-center gap-2 text-xs font-semibold text-gray-200 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={depositToAccountOnDelete}
+                  onChange={(e) => setDepositToAccountOnDelete(e.target.checked)}
+                  className="rounded border-gray-700 text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                />
+                <span>Liquidar y depositar fondos en una cuenta bancaria</span>
+              </label>
+
+              {depositToAccountOnDelete && (
+                <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                  <label className="block text-[11px] text-gray-400">Cuenta de destino:</label>
+                  <select
+                    value={destinationAccountId}
+                    onChange={(e) => setDestinationAccountId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white outline-none focus:border-emerald-500 cursor-pointer"
+                  >
+                    {liquidAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} ({acc.currency || currency}) - Saldo: {acc.balance.toLocaleString()} {acc.currency || currency}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Previsualización de conversión de divisa en liquidación */}
+                  {(() => {
+                    const targetAcc = liquidAccounts.find((a) => a.id === destinationAccountId);
+                    const invCurr = deletingInv.currency || currency;
+                    const targetCurr = targetAcc?.currency || currency;
+                    const invVal = deletingInv.currentValue ?? deletingInv.initialCapital ?? 0;
+                    const convertedVal = targetCurr !== invCurr ? convert(invVal, invCurr, targetCurr) : invVal;
+
+                    return (
+                      <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+                        <span>Se abonará a tu cuenta:</span>
+                        <span className="font-bold font-mono">
+                          {formatCurrency(convertedVal, targetCurr)}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingInv(null)}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 rounded-xl bg-gray-800 text-gray-300 hover:bg-gray-700 font-medium text-xs transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-colors shadow-lg shadow-rose-600/30 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {isDeleting ? 'Procesando...' : depositToAccountOnDelete ? 'Liquidar y Retirar' : 'Eliminar Registro'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
