@@ -126,7 +126,6 @@ export function EditAccountModal({ isOpen, onClose, account }: EditAccountModalP
                 <option value="digital">Billetera Digital (Yape/Plin)</option>
                 <option value="credit">Tarjeta de Crédito</option>
                 <option value="cash">Efectivo</option>
-                <option value="investment">Inversión</option>
               </select>
             </div>
 

@@ -71,7 +71,7 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
   const accounts: AccountItem[] = React.useMemo(() => {
     if (!apiAccounts) return [];
     return apiAccounts
-      .filter((a) => a.status !== 'ARCHIVED')
+      .filter((a) => a.status !== 'ARCHIVED' && a.type?.toUpperCase() !== 'INVESTMENT')
       .map((a) => ({
         id: a.id,
         name: a.name,

@@ -224,6 +224,11 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
 
   const parsedAmount = parseFloat(amount) || 0;
 
+  // Moneda de la cuenta seleccionada
+  const selectedAccount = availableAccounts.find((a) => a.id === selectedAccountId);
+  const currentCurrency = selectedAccount?.currency || 'PEN';
+  const currencySymbol = currentCurrency === 'USD' ? '$' : currentCurrency === 'EUR' ? '€' : 'S/';
+
   // Calculador dinámico según la regla seleccionada
   const calculateSplitPreview = () => {
     if (!parsedAmount || !isSplit) return null;
@@ -231,13 +236,13 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
 
     if (splitMode === 'EQUALLY') {
       const half = parsedAmount / 2;
-      return `Tú: S/ ${half.toFixed(2)} | ${targetName}: S/ ${half.toFixed(2)} (50% / 50%)`;
+      return `Tú: ${currencySymbol} ${half.toFixed(2)} | ${targetName}: ${currencySymbol} ${half.toFixed(2)} (50% / 50%)`;
     }
 
     if (splitMode === 'PERCENTAGE') {
       const myShare = (parsedAmount * userPercentage) / 100;
       const partnerShare = parsedAmount - myShare;
-      return `Tú: S/ ${myShare.toFixed(2)} (${userPercentage}%) | ${targetName}: S/ ${partnerShare.toFixed(2)} (${100 - userPercentage}%)`;
+      return `Tú: ${currencySymbol} ${myShare.toFixed(2)} (${userPercentage}%) | ${targetName}: ${currencySymbol} ${partnerShare.toFixed(2)} (${100 - userPercentage}%)`;
     }
 
     if (splitMode === 'PROPORTIONAL_INCOME') {
@@ -280,13 +285,13 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
 
       const myShare = (parsedAmount * myPct) / 100;
       const partnerShare = parsedAmount - myShare;
-      return `Tú: S/ ${myShare.toFixed(2)} (${myPct}%) | ${targetName}: S/ ${partnerShare.toFixed(2)} (${partnerPct}%) [${labelDetail}]`;
+      return `Tú: ${currencySymbol} ${myShare.toFixed(2)} (${myPct}%) | ${targetName}: ${currencySymbol} ${partnerShare.toFixed(2)} (${partnerPct}%) [${labelDetail}]`;
     }
 
     if (splitMode === 'FIXED_AMOUNT') {
       const partnerFixed = parseFloat(fixedPartnerAmount) || 0;
       const myShare = Math.max(0, parsedAmount - partnerFixed);
-      return `Tú: S/ ${myShare.toFixed(2)} | ${targetName} paga fijo: S/ ${partnerFixed.toFixed(2)}`;
+      return `Tú: ${currencySymbol} ${myShare.toFixed(2)} | ${targetName} paga fijo: ${currencySymbol} ${partnerFixed.toFixed(2)}`;
     }
 
     return null;
@@ -347,7 +352,9 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1">Monto (S/ PEN)</label>
+              <label className="block text-xs font-semibold text-gray-300 mb-1">
+                Monto ({currencySymbol} {currentCurrency})
+              </label>
               <input
                 type="number"
                 value={amount}
@@ -544,7 +551,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
                   {splitMode === 'FIXED_AMOUNT' && (
                     <div className="pt-2">
                       <label className="block text-xs font-semibold text-gray-300 mb-1">
-                        Monto asignado fijamente a {partnerName || 'Pareja'} (S/)
+                        Monto asignado fijamente a {partnerName || 'Pareja'} ({currencySymbol} {currentCurrency})
                       </label>
                       <input
                         type="number"
