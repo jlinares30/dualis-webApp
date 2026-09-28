@@ -8,6 +8,7 @@ import {
   HeartPulse, 
   ArrowDownLeft, 
   Receipt,
+  ArrowRightLeft,
   LucideIcon
 } from 'lucide-react';
 
@@ -17,7 +18,15 @@ export interface CategoryIconStyle {
   colorClass: string;
 }
 
-export function getTransactionIconAndStyle(type: 'income' | 'expense' | string, categoryName?: string, description?: string): CategoryIconStyle {
+export function getTransactionIconAndStyle(type: 'income' | 'expense' | 'transfer' | string, categoryName?: string, description?: string): CategoryIconStyle {
+  if (type === 'transfer' || type === 'TRANSFER') {
+    return {
+      Icon: ArrowRightLeft,
+      badgeClass: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+      colorClass: 'text-indigo-400',
+    };
+  }
+
   if (type === 'income' || type === 'INCOME') {
     return {
       Icon: ArrowDownLeft,

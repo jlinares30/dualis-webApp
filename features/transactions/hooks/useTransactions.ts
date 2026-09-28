@@ -4,7 +4,15 @@ import { CreateTransactionRequest } from '@/types';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
-export function useTransactions(page = 0, size = 10) {
+export function useTransactions(
+  page = 0,
+  size = 10,
+  accountId?: string,
+  type?: 'INCOME' | 'EXPENSE' | 'TRANSFER',
+  search?: string,
+  startDate?: string,
+  endDate?: string
+) {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const hasPartner = useWorkspaceStore((state) => state.hasPartner);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -12,8 +20,18 @@ export function useTransactions(page = 0, size = 10) {
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
 
   return useQuery({
-    queryKey: ['transactions', activeWorkspaceId, page, size],
-    queryFn: () => getTransactions({ workspaceId: activeWorkspaceId!, page, size }),
+    queryKey: ['transactions', activeWorkspaceId, page, size, accountId, type, search, startDate, endDate],
+    queryFn: () =>
+      getTransactions({
+        workspaceId: activeWorkspaceId!,
+        page,
+        size,
+        accountId,
+        type,
+        search,
+        startDate,
+        endDate,
+      }),
     enabled: isAuthenticated && Boolean(isValidUuid),
     refetchInterval: hasPartner ? 5000 : false,
     refetchIntervalInBackground: false,
@@ -41,6 +59,7 @@ export function useUpdateTransaction() {
     mutationFn: ({ id, data }: { id: string; data: Partial<CreateTransactionRequest> }) => updateTransaction(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['debtBalanceSummary'] });
     },
@@ -54,6 +73,7 @@ export function useDeleteTransaction() {
     mutationFn: (id: string) => deleteTransaction(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['debtBalanceSummary'] });
     },

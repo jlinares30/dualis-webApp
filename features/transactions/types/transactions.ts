@@ -17,6 +17,8 @@ export interface TransactionDTO {
   workspaceId: string;
   accountId: string;
   accountName?: string;
+  targetAccountId?: string;
+  targetAccountName?: string;
   categoryId?: string;
   categoryName?: string;
   categoryIcon?: string;
@@ -51,11 +53,17 @@ export interface Transaction {
   title: string;
   category: CategoryType;
   categoryLabel: string;
+  categoryId?: string;
   amount: number;
   currency: string;
   date: string;
-  type: 'expense' | 'income';
+  rawDate?: string;
+  type: 'expense' | 'income' | 'transfer';
   workspace: WorkspaceType;
+  accountId?: string;
+  accountName?: string;
+  targetAccountId?: string;
+  targetAccountName?: string;
   paidBy?: string;
   splitRatio?: string;
 }

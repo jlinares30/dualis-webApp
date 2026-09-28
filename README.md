@@ -102,7 +102,4 @@ pnpm start
 - **Sincronización Bancaria Automática (Open Banking).**
 - **Reportes Financieros Anuales y Gráficos Comparativos Avanzados.**
 
-## License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
+Development by Jorge Linares
