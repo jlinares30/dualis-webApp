@@ -27,27 +27,44 @@ export function CreateAccountModal({ isOpen, onClose }: CreateAccountModalProps)
   const [customCurrency, setCustomCurrency] = useState('');
   const [isCustomCurrency, setIsCustomCurrency] = useState(false);
 
+  const [error, setError] = useState<string | null>(null);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !balance) return;
+    setError(null);
+    if (!name.trim()) {
+      setError('El nombre de la cuenta es obligatorio.');
+      return;
+    }
+    if (!balance && balance !== '0') {
+      setError('Debes ingresar un saldo inicial.');
+      return;
+    }
 
     const finalCurrency = (isCustomCurrency && customCurrency.trim() ? customCurrency.trim() : currency).toUpperCase();
 
     const accountTypeMap: Record<string, string> = {
       bank: 'BANK',
-      digital: 'BANK',
+      digital: 'DIGITAL',
       credit: 'CREDIT_CARD',
       cash: 'CASH',
     };
 
+    // Para tarjetas de crédito, si el usuario ingresó un valor positivo como deuda acumulada,
+    // se asegura el saldo negativo contable (pasivo)
+    let parsedBalance = parseFloat(balance) || 0;
+    if (type === 'credit' && parsedBalance > 0) {
+      parsedBalance = -Math.abs(parsedBalance);
+    }
+
     try {
       await createAccount({
         workspaceId: activeWorkspaceId!,
-        name,
+        name: name.trim(),
         type: accountTypeMap[type] || 'BANK',
-        balance: parseFloat(balance) || 0,
+        balance: parsedBalance,
         currency: finalCurrency,
         description: accountNumber ? `Cuenta termina en ${accountNumber}` : undefined,
       });
@@ -56,10 +73,11 @@ export function CreateAccountModal({ isOpen, onClose }: CreateAccountModalProps)
       setAccountNumber('');
       setCurrency(defaultCurrency);
       setIsCustomCurrency(false);
+      setError(null);
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error al crear cuenta:', err);
-      onClose();
+      setError(err?.message || 'Error al crear la cuenta. Inténtalo nuevamente.');
     }
   };
 
@@ -87,6 +105,12 @@ export function CreateAccountModal({ isOpen, onClose }: CreateAccountModalProps)
             <p className="text-xs text-gray-400">Registra un banco, tarjeta o billetera en cualquier divisa</p>
           </div>
         </div>
+
+        {error && (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-medium">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5 pt-2">
           <div>
@@ -163,7 +187,9 @@ export function CreateAccountModal({ isOpen, onClose }: CreateAccountModalProps)
 
           <div>
             <label className="block text-xs font-semibold text-gray-300 mb-1">
-              Saldo Inicial ({isCustomCurrency && customCurrency ? customCurrency.toUpperCase() : currency})
+              {type === 'credit'
+                ? `Deuda Actual / Saldo Usado (${isCustomCurrency && customCurrency ? customCurrency.toUpperCase() : currency})`
+                : `Saldo Inicial (${isCustomCurrency && customCurrency ? customCurrency.toUpperCase() : currency})`}
             </label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-bold">
@@ -174,11 +200,16 @@ export function CreateAccountModal({ isOpen, onClose }: CreateAccountModalProps)
                 step="any"
                 value={balance}
                 onChange={(e) => setBalance(e.target.value)}
-                placeholder="1000"
+                placeholder={type === 'credit' ? '0 (si no tienes deuda)' : '1000'}
                 className="w-full pl-14 pr-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500"
                 required
               />
             </div>
+            {type === 'credit' && (
+              <p className="text-[11px] text-gray-400 mt-1">
+                Ingresa el monto que debes actualmente en la tarjeta. Se registrará como pasivo contable.
+              </p>
+            )}
           </div>
 
           <div>

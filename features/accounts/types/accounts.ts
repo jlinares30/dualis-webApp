@@ -16,7 +16,7 @@ export interface AccountDTO {
 export interface CreateAccountRequest {
   workspaceId: string;
   name: string;
-  type: 'BANK' | 'CASH' | 'CREDIT_CARD' | 'INVESTMENT' | 'SAVINGS' | 'LOAN' | string;
+  type: 'BANK' | 'CASH' | 'CREDIT_CARD' | 'INVESTMENT' | 'SAVINGS' | 'LOAN' | 'DIGITAL' | string;
   balance: number;
   initialBalance?: number;
   currency?: string;

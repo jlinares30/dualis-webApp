@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import {
   Wallet,
   CreditCard,
@@ -12,7 +13,10 @@ import {
   Trash2,
   AlertTriangle,
   ArrowRightLeft,
-  X
+  X,
+  Archive,
+  Banknote,
+  ReceiptText
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { WorkspaceType } from '@/types';
@@ -33,6 +37,7 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeletingLoading, setIsDeletingLoading] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<'all' | AccountCategory>('all');
   const { activeWorkspaceId, activeWorkspaceType, workspaces } = useWorkspaceStore();
   const { user } = useAuthStore();
   const convert = useExchangeRateStore((s) => s.convert);
@@ -59,12 +64,12 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
     }
   };
 
-  const getAccountCategory = (type: string): AccountCategory => {
-    const lower = type.toLowerCase();
-    if (lower.includes('credit')) return 'credit';
-    if (lower.includes('cash')) return 'cash';
-    if (lower.includes('digital') || lower.includes('yape') || lower.includes('plin')) return 'digital';
-    if (lower.includes('investment')) return 'investment';
+  const getAccountCategory = (type: string, name?: string, description?: string): AccountCategory => {
+    const combined = `${type} ${name || ''} ${description || ''}`.toLowerCase();
+    if (combined.includes('credit') || combined.includes('crédito') || combined.includes('tarjeta')) return 'credit';
+    if (combined.includes('cash') || combined.includes('efectivo')) return 'cash';
+    if (combined.includes('digital') || combined.includes('wallet') || combined.includes('yape') || combined.includes('plin') || combined.includes('paypal') || combined.includes('mp') || combined.includes('mercado')) return 'digital';
+    if (combined.includes('investment') || combined.includes('inversion') || combined.includes('inversión')) return 'investment';
     return 'bank';
   };
 
@@ -72,54 +77,80 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
     if (!apiAccounts) return [];
     return apiAccounts
       .filter((a) => a.status !== 'ARCHIVED' && a.type?.toUpperCase() !== 'INVESTMENT')
-      .map((a) => ({
-        id: a.id,
-        name: a.name,
-        type: getAccountCategory(a.type || 'bank'),
-        balance: a.balance,
-        currency: (a.currency && a.currency.trim() ? a.currency : baseCurrency).toUpperCase(),
-        accountNumber: a.accountNumber,
-        color: a.color || getAccountColor(a.type || 'bank'),
-        workspace: (workspace as 'personal' | 'couple') || 'personal',
-      }));
+      .map((a) => {
+        // Si no viene accountNumber explícito, intentar extraerlo de la descripción "Cuenta termina en XXXX"
+        let parsedAccountNumber = a.accountNumber;
+        if (!parsedAccountNumber && a.description) {
+          const match = a.description.match(/(?:termina en|n[úu]mero|n[ºo]\.?)\s*(\d{2,8})/i);
+          if (match) {
+            parsedAccountNumber = match[1];
+          }
+        }
+
+        const category = getAccountCategory(a.type || 'bank', a.name, a.description);
+
+        return {
+          id: a.id,
+          name: a.name,
+          type: category,
+          balance: a.balance,
+          currency: (a.currency && a.currency.trim() ? a.currency : baseCurrency).toUpperCase(),
+          accountNumber: parsedAccountNumber,
+          color: a.color || getAccountColor(category),
+          workspace: (workspace as 'personal' | 'couple') || 'personal',
+        };
+      });
   }, [apiAccounts, baseCurrency, workspace]);
 
   // Totales convertidos a la moneda del espacio memoizados
   const { convertedTotalBalance, convertedDebitBalance, convertedCreditBalance } = React.useMemo(() => {
-    let total = 0;
     let debit = 0;
     let credit = 0;
 
     accounts.forEach((curr) => {
-      const converted = curr.currency === baseCurrency ? curr.balance : convert(curr.balance, curr.currency, baseCurrency);
-      total += converted;
-
-      if (curr.balance > 0) {
-        debit += converted;
-      } else if (curr.balance < 0) {
-        const positiveAmt = Math.abs(curr.balance);
-        credit += curr.currency === baseCurrency ? positiveAmt : convert(positiveAmt, curr.currency, baseCurrency);
+      // Si es tarjeta de crédito:
+      // - Si el saldo está en negativo (ej. -500), representa deuda de 500.
+      // - Si el usuario lo guardó positivo (ej. 500), en tarjetas de crédito representa la deuda utilizada.
+      if (curr.type === 'credit') {
+        const debt = Math.abs(curr.balance);
+        credit += curr.currency === baseCurrency ? debt : convert(debt, curr.currency, baseCurrency);
+      } else {
+        if (curr.balance >= 0) {
+          const converted = curr.currency === baseCurrency ? curr.balance : convert(curr.balance, curr.currency, baseCurrency);
+          debit += converted;
+        } else {
+          // Sobregiro bancario u saldo negativo en cuenta
+          const positiveAmt = Math.abs(curr.balance);
+          credit += curr.currency === baseCurrency ? positiveAmt : convert(positiveAmt, curr.currency, baseCurrency);
+        }
       }
     });
 
     return {
-      convertedTotalBalance: total,
+      convertedTotalBalance: debit - credit,
       convertedDebitBalance: debit,
       convertedCreditBalance: credit,
     };
   }, [accounts, baseCurrency, convert]);
 
-  // Desglose por moneda
+  // Desglose por moneda (saldo neto por divisa)
   const currencyBreakdown = React.useMemo(() => {
     const map: { [curr: string]: number } = {};
     accounts.forEach((acc) => {
-      map[acc.currency] = (map[acc.currency] || 0) + acc.balance;
+      const netAmount = acc.type === 'credit' ? -Math.abs(acc.balance) : acc.balance;
+      map[acc.currency] = (map[acc.currency] || 0) + netAmount;
     });
     return Object.entries(map).map(([curr, amount]) => ({
       currency: curr,
       amount,
     }));
   }, [accounts]);
+
+  // Cuentas filtradas por categoría
+  const displayedAccounts = React.useMemo(() => {
+    if (selectedCategory === 'all') return accounts;
+    return accounts.filter((a) => a.type === selectedCategory);
+  }, [accounts, selectedCategory]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -210,6 +241,42 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
         )}
       </div>
 
+      {/* Filtros por Categoría */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {[
+          { key: 'all', label: 'Todas las cuentas', count: accounts.length },
+          { key: 'bank', label: 'Bancos', count: accounts.filter((a) => a.type === 'bank').length },
+          { key: 'digital', label: 'Billeteras Digitales', count: accounts.filter((a) => a.type === 'digital').length },
+          { key: 'credit', label: 'Tarjetas de Crédito', count: accounts.filter((a) => a.type === 'credit').length },
+          { key: 'cash', label: 'Efectivo', count: accounts.filter((a) => a.type === 'cash').length },
+        ]
+          .filter((tab) => tab.key === 'all' || tab.count > 0)
+          .map((tab) => {
+            const isActive = selectedCategory === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setSelectedCategory(tab.key as any)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
+                  isActive
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                    : 'bg-gray-900/80 text-gray-400 hover:text-white hover:bg-gray-800 border border-gray-800/80'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                    isActive ? 'bg-indigo-700 text-white' : 'bg-gray-800 text-gray-400'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+      </div>
+
       {/* Grid of Accounts */}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -233,9 +300,13 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
             <Plus className="w-4 h-4" /> Agregar mi primera cuenta
           </button>
         </div>
+      ) : displayedAccounts.length === 0 ? (
+        <div className="text-center py-8 rounded-2xl bg-[#0f172a]/40 border border-gray-800/40 text-gray-400 text-xs">
+          No hay cuentas en esta categoría seleccionada.
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {accounts.map((acc) => {
+          {displayedAccounts.map((acc) => {
             const isNegative = acc.balance < 0;
             const isMenuOpen = openMenuId === acc.id;
 
@@ -284,6 +355,13 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
                             }}
                           />
                           <div className="absolute right-0 top-7 w-36 rounded-xl bg-gray-900 border border-gray-800 shadow-xl py-1 z-40 animate-in fade-in-50 zoom-in-95">
+                            <Link
+                              href={`/transactions?accountId=${acc.id}`}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-200 hover:text-white hover:bg-gray-800 transition-colors text-left"
+                            >
+                              <ReceiptText className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Movimientos</span>
+                            </Link>
                             <button
                               type="button"
                               onClick={(e) => {
@@ -303,10 +381,10 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
                                 setOpenMenuId(null);
                                 setAccountToDelete(acc);
                               }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors text-left cursor-pointer"
+                              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors text-left cursor-pointer"
                             >
-                              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
-                              <span>Eliminar</span>
+                              <Archive className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Archivar</span>
                             </button>
                           </div>
                         </>
@@ -327,14 +405,33 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
                 </div>
 
                 <div className="pt-3 border-t border-gray-800/80 flex items-baseline justify-between">
-                  <span className="text-xs text-gray-400">Saldo actual</span>
+                  <div>
+                    <span className="text-xs text-gray-400 block">
+                      {acc.type === 'credit' ? 'Deuda actual' : 'Saldo actual'}
+                    </span>
+                    {acc.type !== 'credit' && isNegative && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20 mt-1">
+                        ⚠️ En sobregiro
+                      </span>
+                    )}
+                  </div>
                   <div className="text-right">
-                    <span className={`block font-bold text-lg ${isNegative ? 'text-rose-400' : 'text-emerald-400'}`}>
-                      {formatCurrency(acc.balance, acc.currency)}
+                    <span
+                      className={`block font-bold text-lg ${
+                        acc.type === 'credit'
+                          ? acc.balance !== 0
+                            ? 'text-rose-400'
+                            : 'text-emerald-400'
+                          : isNegative
+                          ? 'text-rose-400'
+                          : 'text-emerald-400'
+                      }`}
+                    >
+                      {formatCurrency(acc.type === 'credit' ? Math.abs(acc.balance) : acc.balance, acc.currency)}
                     </span>
                     {acc.currency !== baseCurrency && (
                       <span className="block text-[11px] text-gray-400 font-medium">
-                        ≈ {formatCurrency(convert(acc.balance, acc.currency, baseCurrency), baseCurrency)}
+                        ≈ {formatCurrency(convert(acc.type === 'credit' ? Math.abs(acc.balance) : acc.balance, acc.currency, baseCurrency), baseCurrency)}
                       </span>
                     )}
                   </div>
@@ -363,17 +460,17 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in-50">
           <div className="relative w-full max-w-sm bg-[#0f172a] border border-gray-800 rounded-3xl p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">
-                <AlertTriangle className="w-6 h-6" />
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                <Archive className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="font-bold text-base text-white">¿Eliminar Cuenta?</h3>
-                <p className="text-xs text-gray-400">Esta acción no se puede deshacer</p>
+                <h3 className="font-bold text-base text-white">¿Desactivar / Archivar Cuenta?</h3>
+                <p className="text-xs text-gray-400">Pasará a estado inactivo sin perder tu historial</p>
               </div>
             </div>
 
             <p className="text-xs text-gray-300 leading-relaxed">
-              ¿Estás seguro de que deseas eliminar la cuenta <strong className="text-white">"{accountToDelete.name}"</strong> con saldo de <strong>{formatCurrency(accountToDelete.balance, accountToDelete.currency)}</strong>?
+              La cuenta <strong className="text-white">"{accountToDelete.name}"</strong> se archivará y dejará de aparecer en tus cuentas activas. Toda transacción previa se mantendrá intacta.
             </p>
 
             {/* Si la cuenta tiene saldo positivo y hay otras cuentas disponibles */}
@@ -400,6 +497,17 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
                       </option>
                     ))}
                 </select>
+                {(() => {
+                  if (!targetTransferAccountId) return null;
+                  const destAccount = accounts.find((a) => a.id === targetTransferAccountId);
+                  if (!destAccount || destAccount.currency === accountToDelete.currency) return null;
+                  const estimatedConverted = convert(accountToDelete.balance, accountToDelete.currency, destAccount.currency);
+                  return (
+                    <div className="p-2 rounded-lg bg-gray-950/80 border border-gray-800 text-[11px] text-gray-300">
+                      💡 Conversión estimada: Se transferirán <strong>{formatCurrency(accountToDelete.balance, accountToDelete.currency)}</strong> que equivalen aprox. a <strong className="text-emerald-400">{formatCurrency(estimatedConverted, destAccount.currency)}</strong> en la cuenta receptora.
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
@@ -456,14 +564,14 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
                   }
                 }}
                 disabled={isDeletingAccount || isCreatingTransfer || isDeletingLoading}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-lg shadow-rose-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                className="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-lg shadow-amber-600/30 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isDeletingAccount || isCreatingTransfer || isDeletingLoading ? (
                   <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Eliminar</span>
+                    <Archive className="w-3.5 h-3.5" />
+                    <span>Archivar Cuenta</span>
                   </>
                 )}
               </button>
