@@ -16,20 +16,20 @@ export function BudgetWidget() {
   const overallPercentage = totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0;
 
   const getStatusColor = (percentage: number) => {
-    if (percentage >= 90) {
+    if (percentage >= 100) {
       return {
         bar: 'bg-rose-500',
         badge: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
         icon: AlertTriangle,
-        text: 'En Alerta',
+        text: 'Excedido',
       };
     }
-    if (percentage >= 70) {
+    if (percentage >= 85) {
       return {
         bar: 'bg-amber-500',
         badge: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
         icon: AlertCircle,
-        text: 'Precaución',
+        text: 'Alerta',
       };
     }
     return {

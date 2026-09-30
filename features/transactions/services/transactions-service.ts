@@ -12,6 +12,7 @@ export interface PaginatedResponse<T> {
 export async function getTransactions(params?: {
   workspaceId?: string;
   accountId?: string;
+  categoryId?: string;
   type?: 'INCOME' | 'EXPENSE' | 'TRANSFER';
   search?: string;
   startDate?: string;
@@ -22,6 +23,7 @@ export async function getTransactions(params?: {
   const query = new URLSearchParams();
   if (params?.workspaceId) query.append('workspaceId', params.workspaceId);
   if (params?.accountId) query.append('accountId', params.accountId);
+  if (params?.categoryId) query.append('categoryId', params.categoryId);
   if (params?.type) query.append('type', params.type);
   if (params?.search && params.search.trim()) query.append('search', params.search.trim());
   if (params?.startDate) query.append('startDate', params.startDate);

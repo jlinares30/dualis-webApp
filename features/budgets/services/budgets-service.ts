@@ -3,6 +3,10 @@ import { BudgetDTO, CreateBudgetRequest } from '../types/budgets';
 
 export type { BudgetDTO, CreateBudgetRequest };
 
+// Cache en memoria para progresos de presupuestos (TTL de 60 segundos)
+const progressCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL_MS = 60 * 1000;
+
 export async function getBudgets(workspaceId?: string, month?: number, year?: number): Promise<BudgetDTO[]> {
   if (!workspaceId) return [];
   const params = new URLSearchParams({ workspaceId });
@@ -11,35 +15,25 @@ export async function getBudgets(workspaceId?: string, month?: number, year?: nu
 
   const budgets = await apiFetch<any[]>(`/budgets?${params.toString()}`);
 
-  const budgetsWithProgress = await Promise.all(
-    budgets.map(async (b) => {
-      try {
-        const progress = await apiFetch<any>(`/budgets/${b.id}/progress`);
-        return {
-          id: b.id,
-          name: b.name,
-          categoryId: b.categoryId,
-          categoryName: progress.name || b.name,
-          limitAmount: progress.limitAmount || b.amount || 0,
-          spentAmount: progress.spentAmount ?? 0,
-          currency: progress.currency || b.currency || 'PEN',
-          workspaceId: b.workspaceId,
-        };
-      } catch {
-        return {
-          id: b.id,
-          name: b.name,
-          categoryId: b.categoryId,
-          limitAmount: b.amount || 0,
-          spentAmount: 0,
-          currency: b.currency || 'PEN',
-          workspaceId: b.workspaceId,
-        };
-      }
-    })
-  );
+  return budgets.map((b) => ({
+    id: b.budgetId || b.id,
+    name: b.name,
+    categoryId: b.categoryId,
+    categoryName: b.name,
+    limitAmount: b.limitAmount || b.amount || 0,
+    spentAmount: b.spentAmount ?? 0,
+    currency: b.currency || 'PEN',
+    workspaceId: b.workspaceId,
+    status: b.status,
+  }));
+}
 
-  return budgetsWithProgress;
+export function clearBudgetProgressCache(budgetId?: string) {
+  if (budgetId) {
+    progressCache.delete(budgetId);
+  } else {
+    progressCache.clear();
+  }
 }
 
 export async function createBudget(data: CreateBudgetRequest): Promise<BudgetDTO> {
@@ -56,6 +50,8 @@ export async function createBudget(data: CreateBudgetRequest): Promise<BudgetDTO
     periodYear: data.periodYear || now.getFullYear(),
   };
 
+  clearBudgetProgressCache();
+
   return apiFetch<BudgetDTO>('/budgets', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -63,13 +59,25 @@ export async function createBudget(data: CreateBudgetRequest): Promise<BudgetDTO
 }
 
 export async function updateBudget(id: string, data: Partial<CreateBudgetRequest>): Promise<BudgetDTO> {
+  const isUuidCategory = data.categoryId && /^[0-9a-fA-F-]{36}$/.test(data.categoryId);
+  const payload: any = { ...data };
+  if (data.categoryId !== undefined) {
+    payload.categoryId = isUuidCategory ? data.categoryId : null;
+  }
+  if (data.amount !== undefined || data.limitAmount !== undefined) {
+    payload.amount = data.amount ?? data.limitAmount;
+  }
+
+  clearBudgetProgressCache(id);
+
   return apiFetch<BudgetDTO>(`/budgets/${id}`, {
     method: 'PUT',
-    body: JSON.stringify(data),
+    body: JSON.stringify(payload),
   });
 }
 
 export async function deleteBudget(id: string): Promise<void> {
+  clearBudgetProgressCache(id);
   return apiFetch<void>(`/budgets/${id}`, {
     method: 'DELETE',
   });

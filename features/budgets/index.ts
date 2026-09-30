@@ -11,3 +11,4 @@ export * from './hooks/useBudgets';
 export * from './components/budget-widget';
 export * from './components/create-budget-modal';
 export * from './components/edit-budget-modal';
+export * from './components/budget-transactions-modal';

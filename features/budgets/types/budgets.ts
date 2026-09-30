@@ -31,6 +31,8 @@ export interface UpdateBudgetRequest {
   amount?: number;
   limitAmount?: number;
   currency?: string;
+  periodMonth?: number;
+  periodYear?: number;
 }
 
 export interface BudgetCategory {

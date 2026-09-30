@@ -3,6 +3,7 @@ import { getTransactions, createTransaction, updateTransaction, deleteTransactio
 import { CreateTransactionRequest } from '@/types';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+import { clearBudgetProgressCache } from '@/features/budgets';
 
 export function useTransactions(
   page = 0,
@@ -11,7 +12,8 @@ export function useTransactions(
   type?: 'INCOME' | 'EXPENSE' | 'TRANSFER',
   search?: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  categoryId?: string
 ) {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const hasPartner = useWorkspaceStore((state) => state.hasPartner);
@@ -20,13 +22,14 @@ export function useTransactions(
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
 
   return useQuery({
-    queryKey: ['transactions', activeWorkspaceId, page, size, accountId, type, search, startDate, endDate],
+    queryKey: ['transactions', activeWorkspaceId, page, size, accountId, type, search, startDate, endDate, categoryId],
     queryFn: () =>
       getTransactions({
         workspaceId: activeWorkspaceId!,
         page,
         size,
         accountId,
+        categoryId,
         type,
         search,
         startDate,
@@ -44,7 +47,9 @@ export function useCreateTransaction() {
   return useMutation({
     mutationFn: (newTx: CreateTransactionRequest) => createTransaction(newTx),
     onSuccess: () => {
+      clearBudgetProgressCache();
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['debtBalanceSummary'] });
@@ -58,7 +63,9 @@ export function useUpdateTransaction() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<CreateTransactionRequest> }) => updateTransaction(id, data),
     onSuccess: () => {
+      clearBudgetProgressCache();
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['debtBalanceSummary'] });
@@ -72,7 +79,9 @@ export function useDeleteTransaction() {
   return useMutation({
     mutationFn: (id: string) => deleteTransaction(id),
     onSuccess: () => {
+      clearBudgetProgressCache();
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['debtBalanceSummary'] });

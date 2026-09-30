@@ -23,6 +23,7 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
   const [name, setName] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [limit, setLimit] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (categoriesData && categoriesData.length > 0 && !selectedCategoryId) {
@@ -34,7 +35,14 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !limit || !activeWorkspaceId) return;
+    setErrorMessage(null);
+    if (!name.trim() || !limit || !activeWorkspaceId) return;
+
+    const parsedLimit = parseFloat(limit);
+    if (isNaN(parsedLimit) || parsedLimit <= 0) {
+      setErrorMessage('El límite debe ser un monto mayor a 0');
+      return;
+    }
 
     try {
       let targetCategoryId = selectedCategoryId;
@@ -44,7 +52,7 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
         try {
           const newCat = await createCategory({
             workspaceId: activeWorkspaceId,
-            name: name,
+            name: name.trim(),
             type: 'EXPENSE',
             categoryNature: 'ESSENTIAL',
           });
@@ -56,18 +64,19 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
 
       await createBudget({
         workspaceId: activeWorkspaceId,
-        name,
+        name: name.trim(),
         categoryId: targetCategoryId || undefined,
-        amount: parseFloat(limit) || 0,
-        limitAmount: parseFloat(limit) || 0,
+        amount: parsedLimit,
+        limitAmount: parsedLimit,
         currency: workspaceCurrency,
       });
       setName('');
       setLimit('');
+      setErrorMessage(null);
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error al crear presupuesto:', err);
-      onClose();
+      setErrorMessage(err?.message || 'Error al guardar el presupuesto. Intenta nuevamente.');
     }
   };
 
@@ -75,7 +84,10 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in-50">
       <div className="relative w-full max-w-md bg-[#0f172a] border border-gray-800 rounded-3xl p-6 shadow-2xl space-y-4">
         <button
-          onClick={onClose}
+          onClick={() => {
+            setErrorMessage(null);
+            onClose();
+          }}
           className="absolute top-4 right-4 text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition-colors"
         >
           <X className="w-5 h-5" />
@@ -87,9 +99,16 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
           </div>
           <div>
             <h3 className="font-bold text-lg text-white">Nuevo Presupuesto</h3>
-            <p className="text-xs text-gray-400">Establece un tope tope máximo de gasto mensual</p>
+            <p className="text-xs text-gray-400">Establece un tope máximo de gasto mensual</p>
           </div>
         </div>
+
+        {errorMessage && (
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-400">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5 pt-2">
           <div>
@@ -130,6 +149,8 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
               </label>
               <input
                 type="number"
+                step="any"
+                min="0.01"
                 value={limit}
                 onChange={(e) => setLimit(e.target.value)}
                 placeholder="1000"
@@ -142,7 +163,10 @@ export function CreateBudgetModal({ isOpen, onClose }: CreateBudgetModalProps) {
           <div className="flex gap-3 pt-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                setErrorMessage(null);
+                onClose();
+              }}
               className="flex-1 py-2.5 rounded-xl bg-gray-800 text-gray-300 hover:bg-gray-700 font-medium text-xs transition-colors"
             >
               Cancelar

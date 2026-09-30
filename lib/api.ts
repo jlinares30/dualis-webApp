@@ -69,6 +69,8 @@ export async function apiFetch<T>(
     }
 
 
+    console.error(`[API Error] ${options.method || 'GET'} ${API_BASE_URL}${endpoint} returned ${response.status}:`, errorMessage, errorData);
+
     throw new ApiError(
       response.status,
       errorMessage,
