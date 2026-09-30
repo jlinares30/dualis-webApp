@@ -16,11 +16,14 @@ import {
   X,
   Archive,
   Banknote,
-  ReceiptText
+  ReceiptText,
+  Target,
+  ShieldCheck
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { WorkspaceType } from '@/types';
 import { useAccounts, useDeleteAccount, useUpdateAccount, CreateAccountModal, EditAccountModal, AccountItem, AccountCategory } from '@/features/accounts';
+import { useGoals } from '@/features/goals';
 import { useCreateTransaction } from '@/features/transactions';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
@@ -28,6 +31,7 @@ import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 
 export default function AccountsPage({ workspace = 'personal' }: { workspace?: WorkspaceType }) {
   const { data: apiAccounts, isLoading } = useAccounts();
+  const { data: goals = [] } = useGoals();
   const { mutateAsync: deleteAccountMut, isPending: isDeletingAccount } = useDeleteAccount();
   const { mutateAsync: createTransactionMut, isPending: isCreatingTransfer } = useCreateTransaction();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -133,6 +137,16 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
     };
   }, [accounts, baseCurrency, convert]);
 
+  // Total acumulado en metas de ahorro convertido a moneda base
+  const totalSavingsInGoals = React.useMemo(() => {
+    return goals.reduce((acc, g) => {
+      const gCurr = g.currency || baseCurrency;
+      return acc + convert(g.currentAmount || 0, gCurr, baseCurrency);
+    }, 0);
+  }, [goals, baseCurrency, convert]);
+
+  const freeToSpendBalance = Math.max(0, convertedDebitBalance - totalSavingsInGoals);
+
   // Desglose por moneda (saldo neto por divisa)
   const currencyBreakdown = React.useMemo(() => {
     const map: { [curr: string]: number } = {};
@@ -195,19 +209,39 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="px-4 py-2 rounded-2xl bg-gray-900/80 border border-gray-800 text-center">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="px-3.5 py-2 rounded-2xl bg-gray-900/80 border border-gray-800 text-center">
               <span className="block text-[10px] text-gray-400 uppercase font-semibold">Cuentas Débito</span>
-              <span className="text-sm font-bold text-emerald-400">
+              <span className="text-sm font-bold text-white font-mono">
                 {formatCurrency(convertedDebitBalance, baseCurrency)}
               </span>
             </div>
-            <div className="px-4 py-2 rounded-2xl bg-gray-900/80 border border-gray-800 text-center">
-              <span className="block text-[10px] text-gray-400 uppercase font-semibold">Pasivos / Crédito</span>
-              <span className="text-sm font-bold text-rose-400">
-                {formatCurrency(convertedCreditBalance, baseCurrency)}
+            {totalSavingsInGoals > 0 && (
+              <div className="px-3.5 py-2 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-center">
+                <span className="block text-[10px] text-indigo-400 uppercase font-semibold flex items-center justify-center gap-1">
+                  <Target className="w-2.5 h-2.5" /> En Metas
+                </span>
+                <span className="text-sm font-bold text-indigo-300 font-mono">
+                  {formatCurrency(totalSavingsInGoals, baseCurrency)}
+                </span>
+              </div>
+            )}
+            <div className="px-3.5 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-center">
+              <span className="block text-[10px] text-emerald-400 uppercase font-semibold flex items-center justify-center gap-1">
+                <ShieldCheck className="w-2.5 h-2.5" /> Libre para Gastar
+              </span>
+              <span className="text-sm font-bold text-emerald-300 font-mono">
+                {formatCurrency(freeToSpendBalance, baseCurrency)}
               </span>
             </div>
+            {convertedCreditBalance > 0 && (
+              <div className="px-3.5 py-2 rounded-2xl bg-gray-900/80 border border-gray-800 text-center">
+                <span className="block text-[10px] text-gray-400 uppercase font-semibold">Pasivos / Crédito</span>
+                <span className="text-sm font-bold text-rose-400 font-mono">
+                  {formatCurrency(convertedCreditBalance, baseCurrency)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -404,10 +438,82 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
                   )}
                 </div>
 
+                {/* Desglose de Metas y Saldo Disponible por cuenta */}
+                {(() => {
+                  if (acc.type === 'credit') return null;
+
+                  // Leer mapa de vinculación de metas
+                  let goalAccountMap: Record<string, string> = {};
+                  if (typeof window !== 'undefined') {
+                    try {
+                      const saved = localStorage.getItem(`dualis_goal_accounts_${activeWorkspaceId}`);
+                      if (saved) goalAccountMap = JSON.parse(saved);
+                    } catch {
+                      goalAccountMap = {};
+                    }
+                  }
+
+                  // Metas que están explícitamente vinculadas a esta cuenta
+                  // (o si no tiene vinculación pero coincide la divisa y es la única de esa divisa)
+                  const matchingGoals = goals.filter((g) => {
+                    const linkedAccId = goalAccountMap[g.id];
+                    if (linkedAccId) {
+                      return linkedAccId === acc.id && g.currentAmount > 0;
+                    }
+                    const gCurr = g.currency || baseCurrency;
+                    return gCurr.toUpperCase() === acc.currency.toUpperCase() && g.currentAmount > 0;
+                  });
+
+                  // Sumar convirtiendo a la divisa nativa de la cuenta si difiere
+                  let hasCurrencyConversion = false;
+                  const accountGoalsTotal = matchingGoals.reduce((sum, g) => {
+                    const gCurr = (g.currency || baseCurrency).toUpperCase();
+                    const accCurr = acc.currency.toUpperCase();
+                    if (gCurr !== accCurr) {
+                      hasCurrencyConversion = true;
+                      const converted = convert(g.currentAmount || 0, gCurr, accCurr);
+                      return sum + converted;
+                    }
+                    return sum + (g.currentAmount || 0);
+                  }, 0);
+
+                  const accountFreeToSpend = Math.max(0, acc.balance - accountGoalsTotal);
+
+                  if (accountGoalsTotal <= 0) return null;
+
+                  return (
+                    <div className="mb-3 p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-indigo-300 font-semibold flex items-center gap-1">
+                          <Target className="w-3 h-3 text-indigo-400" /> Respaldando {matchingGoals.length} {matchingGoals.length === 1 ? 'meta' : 'metas'}:
+                        </span>
+                        <div className="text-right">
+                          <span className="font-bold text-indigo-200 font-mono">
+                            {formatCurrency(accountGoalsTotal, acc.currency)}
+                          </span>
+                          {hasCurrencyConversion && (
+                            <span className="block text-[9px] text-indigo-400/80 italic font-sans">
+                              (incluye conv. de divisa)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] pt-1 border-t border-indigo-500/15">
+                        <span className="text-emerald-400 font-medium flex items-center gap-1">
+                          <ShieldCheck className="w-3 h-3" /> Libre para gastar:
+                        </span>
+                        <span className="font-extrabold text-emerald-300 font-mono">
+                          {formatCurrency(accountFreeToSpend, acc.currency)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <div className="pt-3 border-t border-gray-800/80 flex items-baseline justify-between">
                   <div>
                     <span className="text-xs text-gray-400 block">
-                      {acc.type === 'credit' ? 'Deuda actual' : 'Saldo actual'}
+                      {acc.type === 'credit' ? 'Deuda actual' : 'Saldo total en banco'}
                     </span>
                     {acc.type !== 'credit' && isNegative && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded-md border border-rose-500/20 mt-1">
