@@ -1,9 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Calendar, Plus, CheckCircle2, Clock, Trash2, Home, Zap, Tv, Shield, BookOpen, Layers, TrendingUp, Wallet, Check, Sparkles, Lock, UserCheck, Eye, EyeOff, ChevronDown, Sliders, Activity, Receipt, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Calendar, Plus, CheckCircle2, Clock, Trash2, Home, Zap, Tv, Shield, BookOpen, Layers, TrendingUp, Wallet, Check, Sparkles, Lock, UserCheck, Eye, EyeOff, ChevronDown, Sliders, Activity, Receipt, X, AlertTriangle, Search, Filter, ArrowUpRight } from 'lucide-react';
 import { formatCurrency, capitalize } from '@/lib/utils';
-import { useSubscriptions, useCreateSubscription, useToggleSubscriptionPaid, useDeleteSubscription } from '@/features/subscriptions';
+import {
+  useSubscriptions,
+  useCreateSubscription,
+  useToggleSubscriptionPaid,
+  useDeleteSubscription,
+  useSalaryDistributionConfig,
+  useSaveSalaryDistributionConfig,
+} from '@/features/subscriptions';
 import { useSplitRules, useCreateSplitRule, useUpdateSplitRule, useCreateTransaction } from '@/features/transactions';
 import { useAccounts } from '@/features/accounts';
 import { useInvestments } from '@/features/investments';
@@ -34,6 +41,10 @@ export default function SubscriptionsPage() {
   const { mutateAsync: togglePaidMut } = useToggleSubscriptionPaid();
   const { mutateAsync: deleteSubMut } = useDeleteSubscription();
 
+  // Hooks de persistencia de configuración de distribución de sueldo en backend
+  const { data: backendSalaryConfig } = useSalaryDistributionConfig();
+  const { mutateAsync: saveSalaryConfigMut } = useSaveSalaryDistributionConfig();
+
   const { data: splitRules = [] } = useSplitRules();
   const { mutateAsync: createSplitRuleMut } = useCreateSplitRule();
   const { mutateAsync: updateSplitRuleMut } = useUpdateSplitRule();
@@ -45,7 +56,12 @@ export default function SubscriptionsPage() {
   const [category, setCategory] = useState<'HOUSING' | 'UTILITIES' | 'SUBSCRIPTION' | 'HEALTH' | 'EDUCATION' | 'OTHER'>('SUBSCRIPTION');
   const [isVariableAmount, setIsVariableAmount] = useState(false);
 
-  // Modal para confirmar pago con ajuste de monto real en servicios variables
+  // Estados de filtrado y búsqueda de suscripciones
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'OVERDUE' | 'PAID'>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Modal para confirmar pago con ajuste de monto real en servicios variables o fijos
   const [payingSub, setPayingSub] = useState<{ id: string; name: string; amount: number; isVariable: boolean; currency: string } | null>(null);
   const [actualPaidAmount, setActualPaidAmount] = useState<string>('');
   const [payingAccountId, setPayingAccountId] = useState<string>('');
@@ -60,15 +76,27 @@ export default function SubscriptionsPage() {
   const { data: coupleInvestmentsData = [] } = useInvestments(coupleWs?.id || undefined);
   const { mutateAsync: createTxMut } = useCreateTransaction();
 
+  // Helpers de persistencia scoped por usuario y workspace
+  const getSalaryStorageKey = (userId?: string, wsId?: string | null) =>
+    `dualis_salary_flow_${userId || 'guest'}_${wsId || 'default'}`;
+  const getPrivacyStorageKey = (userId?: string, wsId?: string | null) =>
+    `dualis_income_privacy_${userId || 'guest'}_${wsId || 'default'}`;
+
   // Función para confirmar el pago (con monto real si fue editado)
   const handleConfirmBillPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!payingSub) return;
 
+    const parsedActual = actualPaidAmount ? parseFloat(actualPaidAmount) : payingSub.amount;
+    const finalAmount = !isNaN(parsedActual) && parsedActual > 0 ? parsedActual : payingSub.amount;
+
+    if (finalAmount <= 0) {
+      alert('Por favor ingresa un monto válido mayor a 0 para el pago del recibo.');
+      return;
+    }
+
     setIsProcessingPayment(true);
     try {
-      const finalAmount = parseFloat(actualPaidAmount) || payingSub.amount;
-      
       // Si seleccionó una cuenta o hay cuentas disponibles, opcionalmente creamos la transacción de gasto con el monto real
       if (payingAccountId && activeWorkspaceId) {
         const selectedAcc = [...accountsData, ...coupleAccountsData].find((a) => a.id === payingAccountId);
@@ -103,7 +131,9 @@ export default function SubscriptionsPage() {
   const [isExecutingDistribution, setIsExecutingDistribution] = useState(false);
   const [salaryConfig, setSalaryConfig] = useState<SalaryDistributionConfig>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(`dualis_salary_flow_${activeWorkspaceId}`);
+      const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
+      const legacyKey = `dualis_salary_flow_${activeWorkspaceId}`;
+      const saved = localStorage.getItem(scopedKey) || localStorage.getItem(legacyKey);
       if (saved) {
         try {
           return JSON.parse(saved);
@@ -122,10 +152,52 @@ export default function SubscriptionsPage() {
     };
   });
 
+  // Re-sincronizar salaryConfig cuando cambie el backendSalaryConfig, el workspace activo o el usuario
+  useEffect(() => {
+    if (backendSalaryConfig) {
+      setSalaryConfig(backendSalaryConfig);
+      if (typeof window !== 'undefined' && activeWorkspaceId) {
+        const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
+        localStorage.setItem(scopedKey, JSON.stringify(backendSalaryConfig));
+      }
+      return;
+    }
+
+    if (typeof window !== 'undefined' && activeWorkspaceId) {
+      const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
+      const legacyKey = `dualis_salary_flow_${activeWorkspaceId}`;
+      const saved = localStorage.getItem(scopedKey) || localStorage.getItem(legacyKey);
+      if (saved) {
+        try {
+          setSalaryConfig(JSON.parse(saved));
+          return;
+        } catch {
+          // fallback
+        }
+      }
+      setSalaryConfig({
+        enabled: true,
+        frequency: 'MONTHLY',
+        paymentDay: 30,
+        distributionType: 'SPLIT',
+        branches: [],
+        autoExecute: false,
+      });
+    }
+  }, [backendSalaryConfig, activeWorkspaceId, user?.id]);
+
   const handleSaveSalaryConfig = async (newConfig: SalaryDistributionConfig) => {
     setSalaryConfig(newConfig);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(`dualis_salary_flow_${activeWorkspaceId}`, JSON.stringify(newConfig));
+    if (typeof window !== 'undefined' && activeWorkspaceId) {
+      const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
+      localStorage.setItem(scopedKey, JSON.stringify(newConfig));
+    }
+
+    // Persistir en backend
+    try {
+      await saveSalaryConfigMut(newConfig);
+    } catch (err) {
+      console.warn('No se pudo guardar la configuración de sueldo en el servidor, usando almacenamiento local:', err);
     }
   };
 
@@ -172,6 +244,22 @@ export default function SubscriptionsPage() {
   };
 
   const [autoExecutedNotice, setAutoExecutedNotice] = useState<string | null>(null);
+  const [pendingAutoExecution, setPendingAutoExecution] = useState<{
+    yearMonth: string;
+    amount: number;
+    paymentDay: number;
+    targets: {
+      destinationType?: 'ACCOUNT' | 'INVESTMENT';
+      targetId: string;
+      targetName: string;
+      amount: number;
+      currency: string;
+      originalAmount?: number;
+      originalCurrency?: string;
+      workspaceId: string;
+    }[];
+  } | null>(null);
+
   const convert = useExchangeRateStore((s) => s.convert);
 
   // Ingresos recurrentes / fijos
@@ -186,112 +274,170 @@ export default function SubscriptionsPage() {
   const [partnerHidesFromMe, setPartnerHidesFromMe] = useState(false);
   const [showPartnerIncome, setShowPartnerIncome] = useState(false);
 
-  // Detección automática al cargar: Si hoy es el día de pago o posterior y no se ha ejecutado este mes
+  // Detección de Abono Programado Pendiente: Si hoy es el día de pago o posterior y no se ha ejecutado este mes
   useEffect(() => {
-    if (!salaryConfig.autoExecute || !activeWorkspaceId) return;
+    if (!salaryConfig.enabled || !salaryConfig.autoExecute || !activeWorkspaceId) {
+      setPendingAutoExecution(null);
+      return;
+    }
 
     const today = new Date();
     const currentDay = today.getDate();
     const currentYearMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
 
-    // Si ya se ejecutó este mes, evitar duplicar
-    if (salaryConfig.lastExecutedDate === currentYearMonth) return;
+    // Si ya se ejecutó u omitió este mes, no mostrar nada
+    if (salaryConfig.lastExecutedDate === currentYearMonth) {
+      setPendingAutoExecution(null);
+      return;
+    }
 
     // Si ya alcanzó o superó el día de pago configurado
     if (currentDay >= (salaryConfig.paymentDay || 30)) {
       const mySalary = parseFloat(myIncomeInput) || userMonthlyIncome || 0;
-      if (mySalary <= 0) return;
+      if (mySalary <= 0) {
+        setPendingAutoExecution(null);
+        return;
+      }
 
-      const executeAuto = async () => {
-        let targets: {
-          destinationType?: 'ACCOUNT' | 'INVESTMENT';
-          targetId: string;
-          targetName: string;
-          amount: number;
-          currency: string;
-          originalAmount?: number;
-          originalCurrency?: string;
-          workspaceId: string;
-        }[] = [];
+      let targets: {
+        destinationType?: 'ACCOUNT' | 'INVESTMENT';
+        targetId: string;
+        targetName: string;
+        amount: number;
+        currency: string;
+        originalAmount?: number;
+        originalCurrency?: string;
+        workspaceId: string;
+      }[] = [];
 
-        if (salaryConfig.distributionType === 'TOTAL') {
-          const acc = accountsData.find((a) => a.id === salaryConfig.primaryAccountId) || accountsData[0];
-          if (acc) {
-            const accCur = acc.currency || currency;
-            const finalAmount = accCur !== currency ? convert(mySalary, currency, accCur) : mySalary;
-            targets = [
-              {
-                destinationType: 'ACCOUNT',
-                targetId: acc.id,
-                targetName: acc.name,
-                amount: finalAmount,
-                currency: accCur,
-                originalAmount: mySalary,
-                originalCurrency: currency,
-                workspaceId: acc.workspaceId || '',
-              },
-            ];
-          }
-        } else if (salaryConfig.branches && salaryConfig.branches.length > 0) {
-          targets = salaryConfig.branches
-            .map((b) => {
-              const isInv = b.destinationType === 'INVESTMENT';
-              let computed = b.mode === 'PERCENTAGE' ? (mySalary * (b.value || 0)) / 100 : b.value || 0;
-              computed = Math.round(computed * 100) / 100;
+      if (salaryConfig.distributionType === 'TOTAL') {
+        const acc = accountsData.find((a) => a.id === salaryConfig.primaryAccountId) || accountsData[0];
+        if (acc) {
+          const accCur = acc.currency || currency;
+          const finalAmount = accCur !== currency ? convert(mySalary, currency, accCur) : mySalary;
+          targets = [
+            {
+              destinationType: 'ACCOUNT',
+              targetId: acc.id,
+              targetName: acc.name,
+              amount: finalAmount,
+              currency: accCur,
+              originalAmount: mySalary,
+              originalCurrency: currency,
+              workspaceId: acc.workspaceId || '',
+            },
+          ];
+        }
+      } else if (salaryConfig.branches && salaryConfig.branches.length > 0) {
+        targets = salaryConfig.branches
+          .map((b) => {
+            const isInv = b.destinationType === 'INVESTMENT';
+            let computed = b.mode === 'PERCENTAGE' ? (mySalary * (b.value || 0)) / 100 : b.value || 0;
+            computed = Math.round(computed * 100) / 100;
 
-              if (isInv) {
-                const inv = [...investmentsData, ...coupleInvestmentsData].find((i) => i.id === b.targetInvestmentId);
-                const invCur = inv?.currency || currency;
-                const converted = invCur !== currency ? convert(computed, currency, invCur) : computed;
-                return {
-                  destinationType: 'INVESTMENT' as const,
-                  targetId: b.targetInvestmentId || '',
-                  targetName: b.targetInvestmentName || inv?.name || 'Inversión',
-                  amount: converted,
-                  currency: invCur,
-                  originalAmount: computed,
-                  originalCurrency: currency,
-                  workspaceId: b.targetWorkspaceId || inv?.workspaceId || '',
-                };
-              }
-
-              const acc = [...accountsData, ...coupleAccountsData].find((a) => a.id === b.targetAccountId);
-              const accCur = acc?.currency || currency;
-              const converted = accCur !== currency ? convert(computed, currency, accCur) : computed;
+            if (isInv) {
+              const inv = [...investmentsData, ...coupleInvestmentsData].find((i) => i.id === b.targetInvestmentId);
+              const invCur = inv?.currency || currency;
+              const converted = invCur !== currency ? convert(computed, currency, invCur) : computed;
               return {
-                destinationType: 'ACCOUNT' as const,
-                targetId: b.targetAccountId || '',
-                targetName: b.targetAccountName || acc?.name || 'Cuenta',
+                destinationType: 'INVESTMENT' as const,
+                targetId: b.targetInvestmentId || '',
+                targetName: b.targetInvestmentName || inv?.name || 'Inversión',
                 amount: converted,
-                currency: accCur,
+                currency: invCur,
                 originalAmount: computed,
                 originalCurrency: currency,
-                workspaceId: b.targetWorkspaceId || acc?.workspaceId || '',
+                workspaceId: b.targetWorkspaceId || inv?.workspaceId || '',
               };
-            })
-            .filter((t) => t.amount > 0 && t.targetId);
-        }
-
-        if (targets.length > 0) {
-          try {
-            await handleExecuteSalaryDistribution(targets);
-            const updatedConfig = { ...salaryConfig, lastExecutedDate: currentYearMonth };
-            setSalaryConfig(updatedConfig);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem(`dualis_salary_flow_${activeWorkspaceId}`, JSON.stringify(updatedConfig));
             }
-            setAutoExecutedNotice(
-              `🎉 ¡Auto-Abono Ejecutado! Se distribuyeron automáticamente ${currency} ${mySalary.toFixed(2)} según tu regla programada del día ${salaryConfig.paymentDay}.`
-            );
-          } catch (autoErr) {
-            console.error('Error ejecutando auto-abono programado:', autoErr);
-          }
-        }
-      };
 
-      executeAuto();
+            const acc = [...accountsData, ...coupleAccountsData].find((a) => a.id === b.targetAccountId);
+            const accCur = acc?.currency || currency;
+            const converted = accCur !== currency ? convert(computed, currency, accCur) : computed;
+            return {
+              destinationType: 'ACCOUNT' as const,
+              targetId: b.targetAccountId || '',
+              targetName: b.targetAccountName || acc?.name || 'Cuenta',
+              amount: converted,
+              currency: accCur,
+              originalAmount: computed,
+              originalCurrency: currency,
+              workspaceId: b.targetWorkspaceId || acc?.workspaceId || '',
+            };
+          })
+          .filter((t) => t.amount > 0 && t.targetId);
+      }
+
+      if (targets.length > 0) {
+        setPendingAutoExecution({
+          yearMonth: currentYearMonth,
+          amount: mySalary,
+          paymentDay: salaryConfig.paymentDay || 30,
+          targets,
+        });
+      }
     }
-  }, [salaryConfig, activeWorkspaceId, myIncomeInput, userMonthlyIncome, accountsData, coupleAccountsData, investmentsData, coupleInvestmentsData, currency, convert]);
+  }, [
+    salaryConfig.enabled,
+    salaryConfig.autoExecute,
+    salaryConfig.paymentDay,
+    salaryConfig.lastExecutedDate,
+    salaryConfig.distributionType,
+    salaryConfig.primaryAccountId,
+    salaryConfig.branches,
+    activeWorkspaceId,
+    myIncomeInput,
+    userMonthlyIncome,
+    accountsData,
+    coupleAccountsData,
+    investmentsData,
+    coupleInvestmentsData,
+    currency,
+    convert,
+  ]);
+
+  // Manejador para confirmar la ejecución del auto-abono de forma segura
+  const handleConfirmAutoExecution = async () => {
+    if (!pendingAutoExecution || isExecutingDistribution) return;
+
+    try {
+      await handleExecuteSalaryDistribution(pendingAutoExecution.targets);
+      const updatedConfig = { ...salaryConfig, lastExecutedDate: pendingAutoExecution.yearMonth };
+      setSalaryConfig(updatedConfig);
+      if (typeof window !== 'undefined' && activeWorkspaceId) {
+        const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
+        localStorage.setItem(scopedKey, JSON.stringify(updatedConfig));
+      }
+      try {
+        await saveSalaryConfigMut(updatedConfig);
+      } catch (err) {
+        console.warn('Error al actualizar lastExecutedDate en el backend:', err);
+      }
+      setAutoExecutedNotice(
+        `🎉 ¡Abono Exitoso! Se distribuyeron ${currency} ${pendingAutoExecution.amount.toFixed(2)} hacia tus cuentas e inversiones programadas.`
+      );
+      setPendingAutoExecution(null);
+    } catch (err) {
+      console.error('Error al confirmar auto-abono de sueldo:', err);
+    }
+  };
+
+  // Manejador para omitir el auto-abono este mes
+  const handleDismissAutoExecution = async () => {
+    if (!pendingAutoExecution) return;
+    const updatedConfig = { ...salaryConfig, lastExecutedDate: pendingAutoExecution.yearMonth };
+    setSalaryConfig(updatedConfig);
+    if (typeof window !== 'undefined' && activeWorkspaceId) {
+      const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
+      localStorage.setItem(scopedKey, JSON.stringify(updatedConfig));
+    }
+    try {
+      await saveSalaryConfigMut(updatedConfig);
+    } catch (err) {
+      console.warn('Error al actualizar lastExecutedDate en el backend:', err);
+    }
+    setPendingAutoExecution(null);
+  };
 
   // Determinar si el usuario actual es el OWNER (Partner A) o el PARTNER (Partner B) del workspace
   const isOwner = Boolean(
@@ -310,24 +456,39 @@ export default function SubscriptionsPage() {
     'tu pareja';
   const displayPartnerName = capitalize(rawPartnerName);
 
-  // Cargar regla y banderas de privacidad sincronizadas desde el backend (Near Real-Time)
+  // Helper para parsear banderas de privacidad de forma robusta
+  const parsePrivacyFlags = (ruleName?: string) => {
+    if (!ruleName) return { hideA: null, hideB: null };
+    const mA = ruleName.match(/hideA\s*:\s*(true|false)/i);
+    const mB = ruleName.match(/hideB\s*:\s*(true|false)/i);
+    return {
+      hideA: mA ? mA[1].toLowerCase() === 'true' : null,
+      hideB: mB ? mB[1].toLowerCase() === 'true' : null,
+    };
+  };
+
+  // Cargar regla y banderas de privacidad sincronizadas desde el backend con fallback a localStorage scoped
   useEffect(() => {
+    const privacyKey = getPrivacyStorageKey(user?.id, activeWorkspaceId);
+    let savedLocalPrivacy: boolean | null = null;
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(privacyKey);
+      if (stored !== null) {
+        savedLocalPrivacy = stored === 'true';
+      }
+    }
+
     if (splitRules && splitRules.length > 0) {
       const defaultRule = splitRules.find((r) => r.isDefault || r.splitType === 'PROPORTIONAL') || splitRules[0];
       if (defaultRule) {
         const incomeA = defaultRule.partnerAIncome ?? 0;
         const incomeB = defaultRule.partnerBIncome ?? 0;
 
-        // Parsear banderas de privacidad guardadas en el nombre de la regla: e.g. [hideA:true,hideB:false]
-        const ruleName = defaultRule.name || '';
-        const hideAMatch = ruleName.match(/hideA:(true|false)/);
-        const hideBMatch = ruleName.match(/hideB:(true|false)/);
-        const hideA = hideAMatch ? hideAMatch[1] === 'true' : false;
-        const hideB = hideBMatch ? hideBMatch[1] === 'true' : false;
+        const { hideA, hideB } = parsePrivacyFlags(defaultRule.name);
 
-        // Mi privacidad y la de mi pareja según rol (Owner = A, Partner = B)
-        const myHide = isOwner ? hideA : hideB;
-        const partnerHide = isOwner ? hideB : hideA;
+        // Si la regla en el backend no tiene la bandera, recurrir al localStorage scoped del usuario
+        const myHide = (isOwner ? hideA : hideB) ?? savedLocalPrivacy ?? false;
+        const partnerHide = (isOwner ? hideB : hideA) ?? false;
 
         setPartnerHidesFromMe(partnerHide);
 
@@ -348,11 +509,20 @@ export default function SubscriptionsPage() {
           setHasInitializedInputs(true);
         }
       }
+    } else if (!hasInitializedInputs && savedLocalPrivacy !== null) {
+      setHideIncomeFromPartner(savedLocalPrivacy);
     }
-  }, [splitRules, hasInitializedInputs, isOwner, setMonthlyIncomes]);
+  }, [splitRules, hasInitializedInputs, isOwner, setMonthlyIncomes, user?.id, activeWorkspaceId]);
 
   const toggleHideIncome = () => {
-    setHideIncomeFromPartner((prev) => !prev);
+    setHideIncomeFromPartner((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        const privacyKey = getPrivacyStorageKey(user?.id, activeWorkspaceId);
+        localStorage.setItem(privacyKey, String(next));
+      }
+      return next;
+    });
   };
 
   const handleSaveIncomes = async (e: React.FormEvent) => {
@@ -361,6 +531,12 @@ export default function SubscriptionsPage() {
     const partnerInc = parseFloat(partnerIncomeInput) || 0;
     setMonthlyIncomes(myInc, partnerInc);
     setIsSavingIncome(true);
+
+    // Guardar preferencia de privacidad en localStorage scoped
+    if (typeof window !== 'undefined') {
+      const privacyKey = getPrivacyStorageKey(user?.id, activeWorkspaceId);
+      localStorage.setItem(privacyKey, String(hideIncomeFromPartner));
+    }
 
     if (activeWorkspaceId) {
       try {
@@ -375,18 +551,17 @@ export default function SubscriptionsPage() {
         const existingRule = splitRules.find((r) => r.isDefault || r.splitType === 'PROPORTIONAL') || splitRules[0];
 
         // Preservar la privacidad del otro y actualizar la mía
-        let prevHideA = false;
-        let prevHideB = false;
-        if (existingRule?.name) {
-          const mA = existingRule.name.match(/hideA:(true|false)/);
-          const mB = existingRule.name.match(/hideB:(true|false)/);
-          if (mA) prevHideA = mA[1] === 'true';
-          if (mB) prevHideB = mB[1] === 'true';
-        }
+        const parsedExisting = parsePrivacyFlags(existingRule?.name);
+        const prevHideA = parsedExisting.hideA ?? false;
+        const prevHideB = parsedExisting.hideB ?? false;
 
         const newHideA = isOwner ? hideIncomeFromPartner : prevHideA;
         const newHideB = !isOwner ? hideIncomeFromPartner : prevHideB;
-        const syncRuleName = `Repartición Proporcional [hideA:${newHideA},hideB:${newHideB}]`;
+
+        // Limpiar flags antiguos para no duplicar corchetes en el nombre
+        const rawName = existingRule?.name || 'Repartición Proporcional';
+        const cleanBaseName = rawName.replace(/\[\s*hideA\s*:[^,]+,\s*hideB\s*:[^\]]+\]/gi, '').trim() || 'Repartición Proporcional';
+        const syncRuleName = `${cleanBaseName} [hideA:${newHideA},hideB:${newHideB}]`;
 
         if (existingRule?.id) {
           await updateSplitRuleMut({
@@ -431,13 +606,17 @@ export default function SubscriptionsPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !amount || !activeWorkspaceId) return;
+    const parsedAmount = parseFloat(amount);
+    if (!name || isNaN(parsedAmount) || parsedAmount <= 0 || !activeWorkspaceId) {
+      alert('Por favor ingresa un nombre y un monto válido mayor a 0.');
+      return;
+    }
 
     try {
       await createSubMut({
         workspaceId: activeWorkspaceId,
-        name,
-        amount: parseFloat(amount),
+        name: name.trim(),
+        amount: parsedAmount,
         dueDay: parseInt(dueDay, 10),
         category,
         currency,
@@ -464,18 +643,81 @@ export default function SubscriptionsPage() {
     }
   };
 
-  const totalMonthlyCommitments = subs.reduce((acc, item) => acc + item.amount, 0);
   const currentDay = new Date().getDate();
+
+  // Métricas avanzadas de compromisos y estados del mes (Multimoneda)
+  const {
+    totalMonthlyCommitments,
+    paidCommitments,
+    pendingCommitments,
+    paidPercentage,
+    overdueCount,
+    pendingCount,
+    paidCount,
+  } = useMemo(() => {
+    let total = 0;
+    let paid = 0;
+    let overdue = 0;
+    let pending = 0;
+    let completed = 0;
+
+    subs.forEach((item) => {
+      const itemCur = item.currency || currency;
+      const converted = itemCur !== currency ? convert(item.amount, itemCur, currency) : item.amount;
+      total += converted;
+
+      if (item.isPaidThisMonth) {
+        paid += converted;
+        completed += 1;
+      } else {
+        pending += 1;
+        if (item.dueDay < currentDay) {
+          overdue += 1;
+        }
+      }
+    });
+
+    const pendingAmount = Math.max(0, total - paid);
+    const pct = total > 0 ? Math.round((paid / total) * 100) : 0;
+
+    return {
+      totalMonthlyCommitments: total,
+      paidCommitments: paid,
+      pendingCommitments: pendingAmount,
+      paidPercentage: pct,
+      overdueCount: overdue,
+      pendingCount: pending,
+      paidCount: completed,
+    };
+  }, [subs, currency, convert, currentDay]);
+
+  // Filtrado reactivo de suscripciones por estado, categoría y término de búsqueda
+  const filteredSubs = useMemo(() => {
+    return subs.filter((sub) => {
+      const isPastDue = !sub.isPaidThisMonth && sub.dueDay < currentDay;
+      if (statusFilter === 'PENDING' && sub.isPaidThisMonth) return false;
+      if (statusFilter === 'OVERDUE' && (!isPastDue || sub.isPaidThisMonth)) return false;
+      if (statusFilter === 'PAID' && !sub.isPaidThisMonth) return false;
+      if (categoryFilter !== 'ALL' && sub.category !== categoryFilter) return false;
+      if (searchQuery.trim() && !sub.name.toLowerCase().includes(searchQuery.toLowerCase().trim())) return false;
+      return true;
+    });
+  }, [subs, statusFilter, categoryFilter, searchQuery, currentDay]);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300 max-w-6xl">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-800/60">
+      {/* Header Principal */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-gray-800/60">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-flex items-center gap-1">
-              <Calendar className="w-3 h-3" /> Gastos Fijos
+              <Calendar className="w-3 h-3" /> Gastos Fijos y Suscripciones
             </span>
+            {overdueCount > 0 && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 inline-flex items-center gap-1 animate-pulse">
+                <AlertTriangle className="w-3 h-3" /> {overdueCount} por vencer / vencidos
+              </span>
+            )}
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
             Gastos Fijos y Suscripciones
@@ -485,22 +727,117 @@ export default function SubscriptionsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-2xl bg-gray-900 border border-gray-800 text-right">
-            <span className="text-[10px] text-gray-400 font-medium block uppercase tracking-wider">Total Fijo Mensual</span>
-            <span className="text-base font-extrabold text-amber-400">
-              {formatCurrency(totalMonthlyCommitments, currency)}
+        <button
+          onClick={() => setModalOpen(true)}
+          className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer self-start md:self-auto"
+        >
+          <Plus className="w-4 h-4" /> Agregar Pago Fijo
+        </button>
+      </div>
+
+      {/* 3 KPI Cards: Total, Pagado y Por Pagar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Total Fijo Mensual */}
+        <div className="p-4 rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 shadow-xl space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-gray-400">Total Comprometido</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold">
+              {subs.length} {subs.length === 1 ? 'servicio' : 'servicios'}
             </span>
           </div>
+          <div className="text-xl md:text-2xl font-black text-white tracking-tight">
+            {formatCurrency(totalMonthlyCommitments, currency)}
+          </div>
+          <p className="text-[11px] text-gray-500">Monto total presupuestado para este mes</p>
+        </div>
 
-          <button
-            onClick={() => setModalOpen(true)}
-            className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Agregar Pago Fijo
-          </button>
+        {/* Pagado este mes */}
+        <div className="p-4 rounded-3xl bg-[#0f172a]/90 border border-emerald-500/20 shadow-xl space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-emerald-300">Pagado este Mes</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+              {paidPercentage}% completado
+            </span>
+          </div>
+          <div className="text-xl md:text-2xl font-black text-emerald-400 tracking-tight">
+            {formatCurrency(paidCommitments, currency)}
+          </div>
+          <div className="w-full bg-gray-950 rounded-full h-1.5 overflow-hidden border border-gray-800/80">
+            <div
+              className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500"
+              style={{ width: `${paidPercentage}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Pendiente por Pagar */}
+        <div className={`p-4 rounded-3xl bg-[#0f172a]/90 border shadow-xl space-y-2 ${
+          overdueCount > 0 ? 'border-rose-500/40 bg-rose-950/10' : 'border-gray-800/80'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span className={`text-xs font-semibold ${overdueCount > 0 ? 'text-rose-300' : 'text-gray-400'}`}>
+              Por Pagar
+            </span>
+            {overdueCount > 0 ? (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold flex items-center gap-1 animate-pulse">
+                <AlertTriangle className="w-3 h-3" /> {overdueCount} {overdueCount === 1 ? 'vencido' : 'vencidos'}
+              </span>
+            ) : (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-bold">
+                {pendingCount} pendientes
+              </span>
+            )}
+          </div>
+          <div className={`text-xl md:text-2xl font-black tracking-tight ${overdueCount > 0 ? 'text-rose-400' : 'text-white'}`}>
+            {formatCurrency(pendingCommitments, currency)}
+          </div>
+          <p className="text-[11px] text-gray-500">
+            {overdueCount > 0
+              ? 'Atiende primero los pagos vencidos para no generar mora'
+              : 'Suma de compromisos restantes por abonar'}
+          </p>
         </div>
       </div>
+
+      {/* Notificación de Auto-Abono de Sueldo Pendiente de Confirmación */}
+      {pendingAutoExecution && (
+        <div className="p-5 rounded-3xl bg-gradient-to-r from-indigo-950/80 via-indigo-900/40 to-[#0f172a] border border-indigo-500/40 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs animate-in fade-in-50">
+          <div className="flex items-start md:items-center gap-3">
+            <div className="p-3 rounded-2xl bg-indigo-500/20 text-indigo-300">
+              <Zap className="w-5 h-5 fill-current" />
+            </div>
+            <div>
+              <p className="font-bold text-white text-sm flex items-center gap-2">
+                Abono Automático Programado Listo (Día {pendingAutoExecution.paymentDay})
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Listo para distribuir
+                </span>
+              </p>
+              <p className="text-gray-300 mt-0.5">
+                Hoy corresponde distribuir tu sueldo de <span className="font-bold text-white">{currency} {pendingAutoExecution.amount.toFixed(2)}</span> hacia {pendingAutoExecution.targets.length} cuenta{pendingAutoExecution.targets.length > 1 ? 's e inversiones' : ' o inversión'}. ¿Deseas ejecutar las transferencias ahora?
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end md:self-auto">
+            <button
+              type="button"
+              onClick={handleDismissAutoExecution}
+              className="px-3.5 py-2 rounded-xl bg-gray-900 hover:bg-gray-800 border border-gray-700 text-gray-300 hover:text-white text-xs font-semibold cursor-pointer transition-colors"
+            >
+              Omitir este mes
+            </button>
+            <button
+              type="button"
+              disabled={isExecutingDistribution}
+              onClick={handleConfirmAutoExecution}
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              {isExecutingDistribution ? 'Distribuyendo...' : 'Ejecutar Abono Ahora'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Notificación de Auto-Abono de Sueldo */}
       {autoExecutedNotice && (
@@ -510,7 +847,7 @@ export default function SubscriptionsPage() {
               <Zap className="w-5 h-5 fill-current" />
             </div>
             <div>
-              <p className="font-bold text-white text-sm">Distribución Automática Realizada</p>
+              <p className="font-bold text-white text-sm">Distribución Realizada</p>
               <p className="text-emerald-300/90">{autoExecutedNotice}</p>
             </div>
           </div>
@@ -542,7 +879,7 @@ export default function SubscriptionsPage() {
           </div>
 
           {hasPartner && (
-            <div className="flex items-center gap-2">
+            <div className="w-full sm:w-auto flex flex-col sm:items-end gap-1.5">
               {(() => {
                 const u = parseFloat(myIncomeInput) || 0;
                 const p = parseFloat(partnerIncomeInput) || 0;
@@ -551,9 +888,30 @@ export default function SubscriptionsPage() {
                   const uPct = ((u / tot) * 100).toFixed(1);
                   const pPct = ((p / tot) * 100).toFixed(1);
                   return (
-                    <span className="text-xs font-semibold px-3 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
-                      Repartición: Tú {uPct}% | {displayPartnerName} {pPct}%
-                    </span>
+                    <div className="w-full sm:w-72 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-indigo-400 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block shadow-sm shadow-indigo-500/50"></span>
+                          Tú: {uPct}%
+                        </span>
+                        <span className="text-emerald-400 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shadow-sm shadow-emerald-500/50"></span>
+                          {displayPartnerName}: {pPct}%
+                        </span>
+                      </div>
+                      <div className="w-full h-2.5 rounded-full bg-gray-950 p-0.5 border border-gray-800 flex overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-l-full transition-all duration-500"
+                          style={{ width: `${uPct}%` }}
+                          title={`Tú: ${uPct}%`}
+                        />
+                        <div
+                          className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-r-full transition-all duration-500"
+                          style={{ width: `${pPct}%` }}
+                          title={`${displayPartnerName}: ${pPct}%`}
+                        />
+                      </div>
+                    </div>
                   );
                 }
                 return (
@@ -567,7 +925,7 @@ export default function SubscriptionsPage() {
         </div>
 
         <form onSubmit={handleSaveIncomes} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
             <div>
               <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center justify-between">
                 <span>Tu Sueldo Mensual ({currency})</span>
@@ -578,7 +936,7 @@ export default function SubscriptionsPage() {
               <input
                 type="number"
                 step="any"
-                placeholder="Ej. 3500.00"
+                placeholder="0.00"
                 value={myIncomeInput}
                 onChange={(e) => setMyIncomeInput(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-gray-950 border border-indigo-500/40 focus:border-indigo-500 text-xs text-white placeholder-gray-500 outline-none transition-colors"
@@ -648,15 +1006,13 @@ export default function SubscriptionsPage() {
                   )}
                 </div>
               </div>
-            ) : (
-              <div className="hidden md:block"></div>
-            )}
+            ) : null}
 
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className={`flex flex-col sm:flex-row gap-2 ${!hasPartner ? 'md:col-span-1' : 'col-span-1 md:col-span-2 lg:col-span-1'}`}>
               <button
                 type="submit"
                 disabled={isSavingIncome}
-                className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer"
+                className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-xs transition-all shadow-md flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
               >
                 {isSavingIncome ? (
                   <>
@@ -749,6 +1105,123 @@ export default function SubscriptionsPage() {
         </div>
       )}
 
+      {/* Barra de Filtros, Búsqueda y Categorías */}
+      {subs.length > 0 && (
+        <div className="p-4 rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Tabs de Estado con Badges */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('ALL')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                statusFilter === 'ALL'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white border border-gray-800'
+              }`}
+            >
+              <span>Todos</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                statusFilter === 'ALL' ? 'bg-amber-700/60 text-white font-black' : 'bg-gray-800 text-gray-400'
+              }`}>
+                {subs.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('PENDING')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                statusFilter === 'PENDING'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white border border-gray-800'
+              }`}
+            >
+              <span>Pendientes</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                statusFilter === 'PENDING' ? 'bg-indigo-700/60 text-white font-black' : 'bg-gray-800 text-gray-400'
+              }`}>
+                {pendingCount}
+              </span>
+            </button>
+
+            {overdueCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setStatusFilter('OVERDUE')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                  statusFilter === 'OVERDUE'
+                    ? 'bg-rose-600 text-white shadow-sm shadow-rose-600/30'
+                    : 'bg-rose-500/10 text-rose-300 border border-rose-500/30 hover:bg-rose-500/20'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5" />
+                <span>Vencidos</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  statusFilter === 'OVERDUE' ? 'bg-rose-700 text-white font-black' : 'bg-rose-500/30 text-rose-300'
+                }`}>
+                  {overdueCount}
+                </span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setStatusFilter('PAID')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
+                statusFilter === 'PAID'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-gray-900 hover:bg-gray-800 text-gray-400 hover:text-white border border-gray-800'
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Pagados</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                statusFilter === 'PAID' ? 'bg-emerald-700/60 text-white font-black' : 'bg-gray-800 text-gray-400'
+              }`}>
+                {paidCount}
+              </span>
+            </button>
+          </div>
+
+          {/* Búsqueda y Selector de Categoría */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 sm:w-56">
+              <Search className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Buscar servicio..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white placeholder-gray-500 outline-none focus:border-amber-500 transition-colors"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs cursor-pointer p-0.5"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
+
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-3 py-1.5 rounded-xl bg-gray-950 border border-gray-800 text-xs text-gray-300 outline-none focus:border-amber-500 cursor-pointer"
+            >
+              <option value="ALL">Todas las categorías</option>
+              <option value="HOUSING">🏠 Vivienda</option>
+              <option value="UTILITIES">⚡ Servicios</option>
+              <option value="SUBSCRIPTION">📺 Suscripciones</option>
+              <option value="HEALTH">🛡️ Salud</option>
+              <option value="EDUCATION">📚 Educación</option>
+              <option value="OTHER">📦 Otros</option>
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Grid de Gastos Fijos */}
       {isLoading ? (
         <div className="h-64 rounded-2xl bg-gray-900/60 animate-pulse border border-gray-800/50 flex items-center justify-center text-xs text-gray-500">
@@ -770,27 +1243,75 @@ export default function SubscriptionsPage() {
             <Plus className="w-4 h-4" /> Agregar Mi Primer Pago Fijo
           </button>
         </div>
+      ) : filteredSubs.length === 0 ? (
+        <div className="rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 p-8 text-center space-y-3 animate-in fade-in">
+          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <h3 className="font-bold text-base text-white">
+            {statusFilter === 'OVERDUE'
+              ? '🎉 ¡Excelente! No tienes pagos vencidos'
+              : statusFilter === 'PENDING'
+              ? '✨ ¡Al día! Todos tus servicios están pagados este mes'
+              : 'Sin resultados para estos filtros'}
+          </h3>
+          <p className="text-xs text-gray-400 max-w-sm mx-auto">
+            {statusFilter === 'OVERDUE'
+              ? 'Tus compromisos están al día. Ninguna fecha de vencimiento ha expirado sin pagar.'
+              : 'Intenta cambiar de filtro o limpiar el término de búsqueda para ver tus demás servicios.'}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setStatusFilter('ALL');
+              setCategoryFilter('ALL');
+              setSearchQuery('');
+            }}
+            className="px-4 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-semibold cursor-pointer transition-colors"
+          >
+            Ver todos los pagos fijos
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {subs.map((sub) => {
+          {filteredSubs.map((sub) => {
             const Icon = getSubIcon(sub.category);
             const isPastDue = !sub.isPaidThisMonth && sub.dueDay < currentDay;
+            const isDueSoon = !sub.isPaidThisMonth && sub.dueDay >= currentDay && sub.dueDay <= currentDay + 3;
             const isVariable = sub.provider === 'VARIABLE_BILL' || sub.category === 'UTILITIES';
 
             return (
               <div
                 key={sub.id}
-                className="rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 p-6 shadow-xl space-y-4 flex flex-col justify-between relative overflow-hidden group hover:border-gray-700/80 transition-all"
+                className={`rounded-3xl bg-[#0f172a]/90 p-6 shadow-xl space-y-4 flex flex-col justify-between relative overflow-hidden transition-all border ${
+                  sub.isPaidThisMonth
+                    ? 'border-emerald-500/30 hover:border-emerald-500/50 bg-gradient-to-b from-emerald-950/10 to-[#0f172a]'
+                    : isPastDue
+                    ? 'border-rose-500/50 bg-gradient-to-b from-rose-950/20 to-[#0f172a] hover:border-rose-500/80 shadow-rose-950/30'
+                    : isDueSoon
+                    ? 'border-amber-500/40 hover:border-amber-500/60 bg-gradient-to-b from-amber-950/10 to-[#0f172a]'
+                    : 'border-gray-800/80 hover:border-gray-700/80'
+                }`}
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="p-2.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                      <div className={`p-2.5 rounded-2xl border ${
+                        sub.isPaidThisMonth
+                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                          : isPastDue
+                          ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                          : isDueSoon
+                          ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                          : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                      }`}>
                         <Icon className="w-5 h-5" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-1.5">
-                          <h3 className="font-bold text-base text-white truncate max-w-[150px]">{sub.name}</h3>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-bold text-base text-white truncate max-w-[140px]" title={sub.name}>
+                            {sub.name}
+                          </h3>
                           {isVariable ? (
                             <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
                               📊 Variable
@@ -801,15 +1322,31 @@ export default function SubscriptionsPage() {
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] text-gray-400 font-medium">
-                          Vence el día {sub.dueDay} de cada mes
-                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {sub.isPaidThisMonth ? (
+                            <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                              <Check className="w-3 h-3" /> Pagado este mes
+                            </span>
+                          ) : isPastDue ? (
+                            <span className="text-[10px] text-rose-400 font-bold flex items-center gap-1">
+                              <AlertTriangle className="w-3 h-3" /> Venció el día {sub.dueDay}
+                            </span>
+                          ) : isDueSoon ? (
+                            <span className="text-[10px] text-amber-300 font-bold flex items-center gap-1">
+                              <Clock className="w-3 h-3" /> Vence {sub.dueDay === currentDay ? 'HOY' : `en ${sub.dueDay - currentDay} días`}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-400 font-medium">
+                              Vence el día {sub.dueDay} de cada mes
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     <button
                       onClick={() => deleteSubMut(sub.id)}
-                      className="p-1.5 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      className="p-1.5 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                       title="Eliminar pago fijo"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -832,13 +1369,12 @@ export default function SubscriptionsPage() {
                 </div>
 
                 <div className="pt-3 border-t border-gray-800/60 flex items-center justify-between gap-2">
+                  {/* Botón principal de pago */}
                   <button
                     onClick={() => {
                       if (sub.isPaidThisMonth) {
-                        // Si ya está pagado, toggling lo desmarca
                         togglePaidMut(sub.id);
                       } else if (isVariable) {
-                        // Si es variable, abrir modal para ingresar el monto exacto del recibo de este mes
                         setPayingSub({
                           id: sub.id,
                           name: sub.name,
@@ -849,25 +1385,52 @@ export default function SubscriptionsPage() {
                         setActualPaidAmount(String(sub.amount));
                         setPayingAccountId(accountsData[0]?.id || coupleAccountsData[0]?.id || '');
                       } else {
-                        // Si es fijo, permitir marcar directamente o abrir modal
                         togglePaidMut(sub.id);
                       }
                     }}
-                    className={`w-full py-2 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                    className={`flex-1 py-2 px-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${
                       sub.isPaidThisMonth
                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
+                        : isPastDue
+                        ? 'bg-gradient-to-r from-rose-600 to-rose-500 text-white border-rose-500/40 hover:from-rose-500 hover:to-rose-400 shadow-rose-600/20'
                         : isVariable
-                        ? 'bg-gradient-to-r from-amber-600/30 to-orange-600/30 text-amber-300 border-amber-500/40 hover:from-amber-600/40 hover:to-orange-600/40 shadow-sm'
+                        ? 'bg-gradient-to-r from-amber-600/40 to-orange-600/40 text-amber-300 border-amber-500/40 hover:from-amber-600/50 hover:to-orange-600/50'
                         : 'bg-amber-600/20 text-amber-300 border-amber-500/30 hover:bg-amber-600/30'
                     }`}
                   >
                     <CheckCircle2 className="w-4 h-4" />
-                    {sub.isPaidThisMonth
-                      ? 'Pagado este Mes'
-                      : isVariable
-                      ? 'Pagar Recibo con Monto Real'
-                      : 'Marcar como Pagado'}
+                    <span>
+                      {sub.isPaidThisMonth
+                        ? 'Pagado este Mes'
+                        : isPastDue
+                        ? 'Pagar Ahora (Vencido)'
+                        : isVariable
+                        ? 'Pagar con Recibo Real'
+                        : 'Marcar Pagado'}
+                    </span>
                   </button>
+
+                  {/* Botón rápido para abrir modal de ajuste con recibo (incluso para pagos fijos) */}
+                  {!sub.isPaidThisMonth && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPayingSub({
+                          id: sub.id,
+                          name: sub.name,
+                          amount: sub.amount,
+                          isVariable: isVariable,
+                          currency: sub.currency || currency,
+                        });
+                        setActualPaidAmount(String(sub.amount));
+                        setPayingAccountId(accountsData[0]?.id || coupleAccountsData[0]?.id || '');
+                      }}
+                      className="p-2 rounded-xl border border-gray-800 bg-gray-900/80 hover:bg-gray-800 text-gray-400 hover:text-amber-400 transition-colors cursor-pointer"
+                      title="Pagar ingresando monto exacto de recibo y debitar de cuenta"
+                    >
+                      <Receipt className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -916,6 +1479,7 @@ export default function SubscriptionsPage() {
                   <input
                     type="number"
                     step="0.01"
+                    min="0.01"
                     required
                     autoFocus
                     value={actualPaidAmount}
@@ -1036,15 +1600,16 @@ export default function SubscriptionsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 mb-1">
-                    {isVariableAmount ? 'Monto Estimado / Promedio (S/)' : 'Monto Mensual (S/)'}
+                    {isVariableAmount ? `Monto Estimado / Promedio (${currency})` : `Monto Mensual (${currency})`}
                   </label>
                   <input
                     type="number"
                     step="0.01"
+                    min="0.01"
                     required
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    placeholder={isVariableAmount ? 'Ej. 120.00 (Luz)' : '1500.00'}
+                    placeholder={isVariableAmount ? `Ej. 120.00 (${currency})` : `1500.00`}
                     className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500 font-bold"
                   />
                 </div>

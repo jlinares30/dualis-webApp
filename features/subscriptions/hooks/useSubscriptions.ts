@@ -47,3 +47,36 @@ export function useDeleteSubscription() {
     },
   });
 }
+
+export function useSalaryDistributionConfig() {
+  const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
+  const user = useAuthStore((state) => state.user);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  return useQuery({
+    queryKey: ['salaryDistributionConfig', activeWorkspaceId, user?.email],
+    queryFn: async () => {
+      const { getSalaryDistributionConfig } = await import('../services/subscriptions-service');
+      return getSalaryDistributionConfig(activeWorkspaceId!, user?.email);
+    },
+    enabled: isAuthenticated && Boolean(activeWorkspaceId),
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+export function useSaveSalaryDistributionConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: any) => {
+      const { saveSalaryDistributionConfig } = await import('../services/subscriptions-service');
+      return saveSalaryDistributionConfig(payload);
+    },
+    onSuccess: (savedConfig, variables) => {
+      queryClient.setQueryData(
+        ['salaryDistributionConfig', variables.workspaceId, variables.userEmail],
+        savedConfig
+      );
+      queryClient.invalidateQueries({ queryKey: ['salaryDistributionConfig'] });
+    },
+  });
+}

@@ -109,6 +109,54 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [executionSuccess, setExecutionSuccess] = useState(false);
 
+  // Sincronizar localConfig cuando la configuración cargada del backend o props cambie
+  React.useEffect(() => {
+    if (config) {
+      setLocalConfig({
+        enabled: config.enabled ?? true,
+        frequency: config.frequency || 'MONTHLY',
+        paymentDay: config.paymentDay || 30,
+        distributionType: config.distributionType || 'SPLIT',
+        primaryAccountId: config.primaryAccountId || accounts[0]?.id || '',
+        branches:
+          config.branches && config.branches.length > 0
+            ? config.branches
+            : accounts.length > 0
+            ? [
+                {
+                  id: 'branch-1',
+                  destinationType: 'ACCOUNT',
+                  targetAccountId: accounts[0]?.id || '',
+                  targetAccountName: accounts[0]?.name || 'Cuenta Principal',
+                  targetWorkspaceId: accounts[0]?.workspaceId,
+                  workspaceType: 'PERSONAL',
+                  mode: 'PERCENTAGE',
+                  value: 70,
+                  label: 'Gastos y Consumo Diario',
+                },
+                ...(accounts.length > 1
+                  ? [
+                      {
+                        id: 'branch-2',
+                        destinationType: 'ACCOUNT' as const,
+                        targetAccountId: accounts[1]?.id || '',
+                        targetAccountName: accounts[1]?.name || 'Segunda Cuenta',
+                        targetWorkspaceId: accounts[1]?.workspaceId,
+                        workspaceType: 'PERSONAL' as const,
+                        mode: 'PERCENTAGE' as const,
+                        value: 30,
+                        label: 'Ahorro / Emergencia',
+                      },
+                    ]
+                  : []),
+              ]
+            : [],
+        autoExecute: config.autoExecute ?? false,
+        lastExecutedDate: config.lastExecutedDate,
+      });
+    }
+  }, [config, accounts]);
+
   // Unir todas las cuentas disponibles indicando de qué workspace son
   const allAvailableAccounts = [
     ...accounts.map((a) => ({ ...a, workspaceType: 'PERSONAL' as const, groupLabel: '👤 Mis Cuentas Personales' })),
@@ -324,7 +372,7 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
   };
 
   return (
-    <div className="rounded-3xl bg-[#090d16] border border-gray-800/80 p-6 md:p-8 shadow-2xl relative overflow-hidden transition-all duration-300">
+    <div className="rounded-3xl bg-[#090d16] border border-gray-800/80 p-4 sm:p-6 md:p-8 shadow-2xl relative overflow-hidden transition-all duration-300">
       {/* Luces y acentos de fondo */}
       <div className="absolute top-0 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-10 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -336,7 +384,7 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
             <Sparkles className="w-3.5 h-3.5" />
             <span>Automatización Inteligente de Sueldo</span>
           </div>
-          <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+          <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight flex items-center gap-2">
             Flujo de Abono y Distribución a Cuentas
           </h2>
           <p className="text-xs text-gray-400 max-w-xl">
@@ -345,12 +393,12 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
         </div>
 
         {/* Acciones principales */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-1.5 cursor-pointer"
+            className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
           >
             {hasSaved ? (
               <>
@@ -369,7 +417,7 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
             type="button"
             onClick={handleExecuteNow}
             disabled={isExecuting || salaryAmount <= 0}
-            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-600/20 flex items-center gap-1.5 cursor-pointer"
+            className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-1.5 cursor-pointer"
             title="Genera las transacciones de ingreso reales ahora mismo en tus cuentas bancarias"
           >
             {isExecuting ? (
@@ -397,7 +445,7 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
       )}
 
       {/* Controles de Configuración de Tiempo */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-[#0e1422] border border-gray-800 text-xs">
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4 rounded-2xl bg-[#0e1422] border border-gray-800 text-xs">
         <div>
           <label className="block text-[11px] font-semibold text-gray-400 mb-1">Día de Abono / Cobro</label>
           <div className="relative">
@@ -517,10 +565,10 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
 
       {/* DIAGRAMA DE FLUJO INTERACTIVO */}
       <div className="mt-8 relative">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-center">
           
           {/* NODO ORIGEN: SUELDO MENSUAL */}
-          <div className="lg:col-span-4">
+          <div className="xl:col-span-4 w-full">
             <div className="relative p-5 rounded-3xl bg-gradient-to-br from-emerald-950/60 via-[#0e1a17] to-gray-950 border-2 border-emerald-500/40 shadow-xl group hover:border-emerald-400 transition-all">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
@@ -529,9 +577,9 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
                 <Wallet className="w-5 h-5 text-emerald-400" />
               </div>
               <p className="text-xs text-gray-400 font-medium">Sueldo / Ingreso Fijo</p>
-              <div className="flex items-baseline gap-1 mt-1">
+              <div className="flex items-baseline gap-1 mt-1 flex-wrap">
                 <span className="text-xs text-emerald-400 font-bold">{currency}</span>
-                <span className="text-2xl font-black text-white tracking-tight">
+                <span className="text-xl sm:text-2xl font-black text-white tracking-tight break-all">
                   {salaryAmount.toLocaleString('es-PE', { minimumFractionDigits: 2 })}
                 </span>
               </div>
@@ -543,14 +591,14 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
           </div>
 
           {/* CONECTOR CENTRAL CONECTADO (FLECHA INTERACTIVA / INDICADOR DE FLUJO) */}
-          <div className="lg:col-span-1 hidden lg:flex flex-col items-center justify-center">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-md">
-              <ArrowRight className="w-5 h-5" />
+          <div className="xl:col-span-1 flex flex-col items-center justify-center my-[-4px] xl:my-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-md rotate-90 xl:rotate-0">
+              <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
 
           {/* NODO(S) DESTINO: CUENTA TOTAL O RAMAS DIVIDIDAS */}
-          <div className="lg:col-span-7 space-y-4">
+          <div className="xl:col-span-7 space-y-4 w-full min-w-0">
             {localConfig.distributionType === 'TOTAL' ? (
               /* MODO TOTAL (100% a una cuenta) */
               <div className="p-5 rounded-3xl bg-[#0f172a] border border-gray-800 space-y-3">
@@ -668,9 +716,9 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
                         {/* Selector de cuenta o inversión destino */}
-                        <div className="sm:col-span-6">
+                        <div className="md:col-span-6 min-w-0">
                           <label className="block text-[10px] text-gray-400 mb-0.5">Destino (Cuenta o Inversión)</label>
                           <select
                             value={
@@ -696,7 +744,7 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
                                 });
                               }
                             }}
-                            className="w-full px-2.5 py-1.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500 cursor-pointer"
+                            className="w-full px-2.5 py-1.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500 cursor-pointer truncate"
                           >
                             <optgroup label="👤 Mis Cuentas Personales">
                               {accounts.map((a) => (
@@ -727,7 +775,7 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
                         </div>
 
                         {/* Modo (Porcentaje vs Monto Fijo) */}
-                        <div className="sm:col-span-3">
+                        <div className="md:col-span-3 min-w-0">
                           <label className="block text-[10px] text-gray-400 mb-0.5">Asignación</label>
                           <div className="flex items-center gap-1 bg-gray-900 rounded-xl border border-gray-800 p-0.5">
                             <button
@@ -752,7 +800,7 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
                         </div>
 
                         {/* Input de Valor */}
-                        <div className="sm:col-span-3">
+                        <div className="md:col-span-3 min-w-0">
                           <label className="block text-[10px] text-gray-400 mb-0.5">
                             {branch.mode === 'PERCENTAGE' ? 'Porcentaje' : 'Monto Fijo'}
                           </label>
@@ -765,7 +813,7 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
                                 handleUpdateBranch(branch.id, { value: parseFloat(e.target.value) || 0 })
                               }
                               placeholder="0"
-                              className="w-full px-2.5 py-1.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white font-bold outline-none focus:border-indigo-500"
+                              className="w-full pl-2.5 pr-8 py-1.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white font-bold outline-none focus:border-indigo-500"
                             />
                             <span className="text-[10px] text-gray-500 absolute right-2.5 top-1/2 -translate-y-1/2 font-semibold">
                               {branch.mode === 'PERCENTAGE' ? '%' : currency}
