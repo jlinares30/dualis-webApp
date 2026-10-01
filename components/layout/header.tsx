@@ -81,11 +81,11 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
 
   return (
     <header className="sticky top-0 z-30 h-16 bg-[#090d16]/90 backdrop-blur-md border-b border-gray-800/80 px-4 md:px-8 flex items-center justify-between">
-      {/* Left: Mobile Toggle & Context Switcher */}
+      {/* Left: Mobile & Tablet Toggle & Context Switcher */}
       <div className="flex items-center gap-3">
         <button
           onClick={onOpenMobileMenu}
-          className="md:hidden p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/60 transition-colors"
+          className="lg:hidden p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/60 transition-colors cursor-pointer"
           aria-label="Abrir menú"
         >
           <Menu className="w-5 h-5" />

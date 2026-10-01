@@ -174,14 +174,14 @@ export function Sidebar({ mobileOpen, setMobileOpen }: SidebarProps) {
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:block shrink-0 h-screen sticky top-0">
+      {/* Desktop Sidebar (visible a partir de pantallas de escritorio lg: 1024px) */}
+      <aside className="hidden lg:block shrink-0 h-screen sticky top-0">
         {navContent}
       </aside>
 
-      {/* Mobile Drawer Backdrop & Sidebar */}
+      {/* Mobile & Tablet Drawer Backdrop & Sidebar (visible en pantallas móviles y tablets < 1024px) */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden flex">
+        <div className="fixed inset-0 z-50 lg:hidden flex">
           <div
             className="fixed inset-0 bg-black/70 backdrop-blur-sm transition-opacity"
             onClick={() => setMobileOpen(false)}
