@@ -264,123 +264,133 @@ export default function TransactionsPage({ workspace }: { workspace?: WorkspaceT
       )}
 
       {/* Filters Bar */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-[#0f172a]/90 border border-gray-800/80">
-        {/* Search */}
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-gray-500" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por concepto..."
-            className="w-full pl-10 pr-4 py-2 rounded-xl bg-gray-900/90 border border-gray-800 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500 transition-all"
-          />
-        </div>
-
-        {/* Cuenta selector opcional si hay cuentas */}
-        {accountsList && accountsList.length > 0 && (
-          <div className="w-full md:w-auto">
-            <select
-              value={selectedAccountId || ''}
-              onChange={(e) => {
-                const val = e.target.value || undefined;
-                setSelectedAccountId(val);
-                setCurrentPage(0);
-                if (val) {
-                  router.push(`/transactions?accountId=${val}`);
-                } else {
-                  router.push('/transactions');
-                }
-              }}
-              className="w-full md:w-auto px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-xs text-gray-200 outline-none focus:border-indigo-500 cursor-pointer"
-            >
-              <option value="">Todas las cuentas</option>
-              {accountsList
-                .filter((a) => a.status !== 'ARCHIVED')
-                .map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name} ({acc.currency})
-                  </option>
-                ))}
-            </select>
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-[#0f172a]/90 border border-gray-800/80 shadow-md">
+        {/* Top row in mobile/tablet: Search & Account */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-1 min-w-0">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por concepto o categoría..."
+              className="w-full pl-10 pr-4 py-2 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+            />
           </div>
-        )}
 
-        {/* Type selector */}
-        <div className="flex items-center gap-1 bg-gray-900/90 p-1 rounded-xl border border-gray-800 w-full md:w-auto">
-          <button
-            onClick={() => { setSelectedType('all'); setCurrentPage(0); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              selectedType === 'all' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Todos
-          </button>
-          <button
-            onClick={() => { setSelectedType('expense'); setCurrentPage(0); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              selectedType === 'expense' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Gastos
-          </button>
-          <button
-            onClick={() => { setSelectedType('income'); setCurrentPage(0); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-              selectedType === 'income' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            Ingresos
-          </button>
-          <button
-            onClick={() => { setSelectedType('transfer'); setCurrentPage(0); }}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 ${
-              selectedType === 'transfer' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <ArrowRightLeft className="w-3 h-3" />
-            <span>Transferencias</span>
-          </button>
+          {/* Cuenta selector opcional si hay cuentas */}
+          {accountsList && accountsList.length > 0 && (
+            <div className="sm:w-48 shrink-0">
+              <select
+                value={selectedAccountId || ''}
+                onChange={(e) => {
+                  const val = e.target.value || undefined;
+                  setSelectedAccountId(val);
+                  setCurrentPage(0);
+                  if (val) {
+                    router.push(`/transactions?accountId=${val}`);
+                  } else {
+                    router.push('/transactions');
+                  }
+                }}
+                className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-xs text-gray-200 outline-none focus:border-indigo-500 cursor-pointer"
+              >
+                <option value="">Todas las cuentas</option>
+                {accountsList
+                  .filter((a) => a.status !== 'ARCHIVED')
+                  .map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} ({acc.currency})
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
         </div>
 
-        {/* Date Range Filters */}
-        <div className="flex items-center gap-2 w-full md:w-auto bg-gray-900/90 p-1.5 px-3 rounded-xl border border-gray-800 text-xs">
-          <Calendar className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-          <div className="flex items-center gap-1.5 text-gray-400">
-            <span className="text-[11px] font-medium text-gray-400">Desde:</span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value);
-                setCurrentPage(0);
-              }}
-              className="bg-transparent border-0 text-white text-xs outline-none cursor-pointer [color-scheme:dark]"
-            />
-            <span className="text-[11px] font-medium text-gray-400">Hasta:</span>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value);
-                setCurrentPage(0);
-              }}
-              className="bg-transparent border-0 text-white text-xs outline-none cursor-pointer [color-scheme:dark]"
-            />
-            {(startDate || endDate) && (
-              <button
-                type="button"
-                onClick={() => {
-                  setStartDate('');
-                  setEndDate('');
-                  setCurrentPage(0);
-                }}
-                className="text-gray-400 hover:text-white p-1 hover:bg-gray-800 rounded transition-colors"
-                title="Limpiar rango de fechas"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+        {/* Bottom row / Right row: Type selector & Date Range */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-wrap">
+          {/* Type selector */}
+          <div className="flex items-center gap-1 bg-gray-900 p-1 rounded-xl border border-gray-800 overflow-x-auto">
+            <button
+              onClick={() => { setSelectedType('all'); setCurrentPage(0); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                selectedType === 'all' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => { setSelectedType('expense'); setCurrentPage(0); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                selectedType === 'expense' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Gastos
+            </button>
+            <button
+              onClick={() => { setSelectedType('income'); setCurrentPage(0); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                selectedType === 'income' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Ingresos
+            </button>
+            <button
+              onClick={() => { setSelectedType('transfer'); setCurrentPage(0); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap ${
+                selectedType === 'transfer' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              <ArrowRightLeft className="w-3 h-3" />
+              <span>Transferencias</span>
+            </button>
+          </div>
+
+          {/* Date Range Filters */}
+          <div className="flex items-center gap-2 bg-gray-900 p-1.5 px-3 rounded-xl border border-gray-800 text-xs shrink-0 flex-wrap sm:flex-nowrap">
+            <Calendar className="w-4 h-4 text-indigo-400 shrink-0" />
+            <div className="flex items-center gap-2 text-gray-300">
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] font-medium text-gray-400">Desde:</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    setCurrentPage(0);
+                  }}
+                  className="bg-gray-800/80 px-2 py-1 rounded-lg border border-gray-700/60 text-white text-xs outline-none focus:border-indigo-500 cursor-pointer [color-scheme:dark]"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[11px] font-medium text-gray-400">Hasta:</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setCurrentPage(0);
+                  }}
+                  className="bg-gray-800/80 px-2 py-1 rounded-lg border border-gray-700/60 text-white text-xs outline-none focus:border-indigo-500 cursor-pointer [color-scheme:dark]"
+                />
+              </div>
+              {(startDate || endDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                    setCurrentPage(0);
+                  }}
+                  className="text-gray-400 hover:text-white p-1 hover:bg-gray-800 rounded transition-colors ml-1"
+                  title="Limpiar rango de fechas"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -424,13 +434,13 @@ export default function TransactionsPage({ workspace }: { workspace?: WorkspaceT
                   key={tx.id}
                   className="flex items-center justify-between p-4 hover:bg-gray-900/40 transition-colors group"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`p-3 rounded-xl border ${badgeClass}`}>
-                      <Icon className="w-5 h-5" />
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
+                    <div className={`p-2.5 sm:p-3 rounded-xl border shrink-0 ${badgeClass}`}>
+                      <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm text-white">{tx.title}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-xs sm:text-sm text-white truncate max-w-[200px] sm:max-w-xs">{tx.title}</span>
                         {hasPartner && tx.workspace === 'couple' ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-md">
                             <Users className="w-3 h-3" /> Compartido Pareja
@@ -472,9 +482,9 @@ export default function TransactionsPage({ workspace }: { workspace?: WorkspaceT
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <span className={`font-bold text-base block ${
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-2">
+                    <div className="text-right whitespace-nowrap shrink-0">
+                      <span className={`font-bold text-sm sm:text-base block ${
                         tx.type === 'transfer'
                           ? 'text-indigo-400'
                           : isIncome

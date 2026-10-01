@@ -1082,14 +1082,14 @@ export default function SettingsPage() {
             <span className="block text-xs font-semibold text-gray-300 mb-2">
               Agregar o personalizar otra divisa:
             </span>
-            <div className="flex flex-col sm:flex-row items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-wrap">
               <input
                 type="text"
-                placeholder="Código (ej. AUD, CHF, JPY)"
+                placeholder="CÓDIGO (EJ. AUD, CHF, JPY)"
                 maxLength={4}
                 value={newCurrencyCode}
                 onChange={(e) => setNewCurrencyCode(e.target.value.toUpperCase())}
-                className="w-full sm:w-44 px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white uppercase outline-none focus:border-indigo-500"
+                className="flex-1 sm:w-44 min-w-[130px] px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white uppercase outline-none focus:border-indigo-500"
               />
               <input
                 type="number"
@@ -1097,12 +1097,12 @@ export default function SettingsPage() {
                 placeholder="Tasa vs 1 USD (ej. 1.55)"
                 value={newCurrencyRate}
                 onChange={(e) => setNewCurrencyRate(e.target.value)}
-                className="w-full sm:w-44 px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500"
+                className="flex-1 sm:w-44 min-w-[130px] px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500"
               />
               <button
                 type="button"
                 onClick={handleAddCustomRate}
-                className="w-full sm:w-auto px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                className="w-full sm:w-auto shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-md whitespace-nowrap"
               >
                 <Plus className="w-3.5 h-3.5" /> Agregar Divisa
               </button>
