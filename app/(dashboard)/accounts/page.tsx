@@ -442,22 +442,10 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
                 {(() => {
                   if (acc.type === 'credit') return null;
 
-                  // Leer mapa de vinculación de metas
-                  let goalAccountMap: Record<string, string> = {};
-                  if (typeof window !== 'undefined') {
-                    try {
-                      const saved = localStorage.getItem(`dualis_goal_accounts_${activeWorkspaceId}`);
-                      if (saved) goalAccountMap = JSON.parse(saved);
-                    } catch {
-                      goalAccountMap = {};
-                    }
-                  }
-
-                  // Metas que están explícitamente vinculadas a esta cuenta (prioriza g.accountId de la BD)
+                  // Metas que están explícitamente vinculadas a esta cuenta desde la base de datos (g.accountId)
                   const matchingGoals = goals.filter((g) => {
-                    const linkedAccId = g.accountId || goalAccountMap[g.id];
-                    if (linkedAccId) {
-                      return linkedAccId === acc.id && g.currentAmount > 0;
+                    if (g.accountId) {
+                      return g.accountId === acc.id && g.currentAmount > 0;
                     }
                     const gCurr = g.currency || baseCurrency;
                     return gCurr.toUpperCase() === acc.currency.toUpperCase() && g.currentAmount > 0;

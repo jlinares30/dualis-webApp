@@ -96,8 +96,7 @@ dualis-webApp/
 ### 4.3 Manejo de Estado y Caché
 - **Datos de Servidor:** Manejados exclusivamente mediante TanStack React Query (`useQuery`, `useMutation`).
   - Tras una mutación exitosa, **siempre invalidar las queries correspondientes** usando `queryClient.invalidateQueries({ queryKey: [...] })` para mantener la sincronización entre pestañas y vistas.
-- **Estado de UI / Contexto de Sesión:** Manejado con Zustand stores (`useAuthStore`, `useWorkspaceStore`, `useExchangeRateStore`).
-- **Persistencia Local:** Para preferencias locales de dispositivo o asignaciones cliente temporales (ej. vinculación local de metas), utilizar prefijos claros con el `activeWorkspaceId`: `dualis_goal_accounts_${activeWorkspaceId}`.
+- **Persistencia Local:** Para preferencias locales estrictas de UI de dispositivo, utilizar prefijos claros con el `activeWorkspaceId`. Las entidades de dominio (como cuentas y vinculación de metas) residen 100% en base de datos.
 
 ### 4.4 Estilizado con Tailwind CSS
 - Diseños modernos, oscuros (*dark-mode first*), refinados y de alta jerarquía visual:
