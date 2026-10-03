@@ -3,13 +3,15 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { loginUser } from '@/lib/auth';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
-import { Lock, Mail, ShieldCheck, AlertCircle, ArrowRight } from 'lucide-react';
+import { Lock, Mail, ShieldCheck, AlertCircle, ArrowRight, Clock } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isSessionExpired = searchParams.get('expired') === 'true';
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const [email, setEmail] = useState('');
@@ -89,6 +91,14 @@ export default function LoginPage() {
               Ingresa a tu cuenta para acceder a tu panel financiero.
             </p>
           </div>
+
+          {/* Session Expired Notice */}
+          {isSessionExpired && !error && (
+            <div className="mb-5 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center gap-2.5 text-xs text-amber-300 animate-in fade-in">
+              <Clock className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>Tu sesión ha caducado por inactividad o seguridad. Por favor inicia sesión nuevamente.</span>
+            </div>
+          )}
 
           {/* Error Alert */}
           {error && (

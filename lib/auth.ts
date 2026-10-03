@@ -143,7 +143,17 @@ export async function submitOnboarding(payload: OnboardingPayload): Promise<User
 
 export function logout(): void {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('dualis_auth_token');
-    window.location.reload();
+    // Limpiar claves del sistema Dualis
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('dualis') || key.includes('dualis'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+    // Forzar recarga limpia hacia login
+    window.location.href = '/login';
   }
 }

@@ -41,8 +41,20 @@ export async function apiFetch<T>(
     }
 
     if (response.status === 401 && typeof window !== 'undefined') {
-      // Manejar token expirado o no autorizado
-      localStorage.removeItem('dualis_auth_token');
+      // Manejar token expirado o no autorizado limpiando el almacenamiento local
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('dualis') || key.includes('dualis'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+      // Si no estamos ya en rutas de autenticación, redirigir a login
+      if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/register')) {
+        window.location.href = '/login?expired=true';
+      }
     }
 
 
