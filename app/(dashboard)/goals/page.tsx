@@ -7,6 +7,7 @@ import { useGoals, useCreateGoal, useUpdateGoal, useDepositGoal, useDeleteGoal, 
 import { useAccounts } from '@/features/accounts';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
+import { CustomExchangeRateInput } from '@/components/ui/custom-exchange-rate-input';
 
 const COMMON_CURRENCIES = ['PEN', 'USD', 'EUR', 'COP', 'MXN', 'CLP', 'ARS', 'BRL'];
 
@@ -66,31 +67,21 @@ export default function GoalsPage() {
   const [category, setCategory] = useState<'EMERGENCY' | 'TRAVEL' | 'HOUSE' | 'CAR' | 'TECH' | 'OTHER'>('EMERGENCY');
   const [selectedAccountId, setSelectedAccountId] = useState('');
 
-  // Local map of goalId to backed accountId
-  const [goalAccountMap, setGoalAccountMap] = useState<Record<string, string>>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem(`dualis_goal_accounts_${activeWorkspaceId}`);
-        return saved ? JSON.parse(saved) : {};
-      } catch {
-        return {};
+  // Local map of goalId to backed accountId (prioriza goal.accountId del backend)
+  const [localAccountOverrides, setLocalAccountOverrides] = useState<Record<string, string>>({});
+
+  const goalAccountMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    goals.forEach((g) => {
+      if (g.accountId) {
+        map[g.id] = g.accountId;
       }
-    }
-    return {};
-  });
+    });
+    return { ...map, ...localAccountOverrides };
+  }, [goals, localAccountOverrides]);
 
   const saveGoalAccount = (goalId: string, accId: string) => {
-    setGoalAccountMap((prev) => {
-      const next = { ...prev, [goalId]: accId };
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem(`dualis_goal_accounts_${activeWorkspaceId}`, JSON.stringify(next));
-        } catch (e) {
-          console.error(e);
-        }
-      }
-      return next;
-    });
+    setLocalAccountOverrides((prev) => ({ ...prev, [goalId]: accId }));
   };
 
   // Deposit Form State
@@ -129,26 +120,11 @@ export default function GoalsPage() {
           deadlineDate: editDeadlineDate ? editDeadlineDate : undefined,
           category: editCategory,
           currency: editCurrency,
+          accountId: editAccountId || undefined,
         },
       });
 
-      if (editAccountId) {
-        saveGoalAccount(editingGoal.id, editAccountId);
-      } else {
-        setGoalAccountMap((prev) => {
-          const next = { ...prev };
-          delete next[editingGoal.id];
-          if (typeof window !== 'undefined') {
-            try {
-              localStorage.setItem(`dualis_goal_accounts_${activeWorkspaceId}`, JSON.stringify(next));
-            } catch (err) {
-              console.error(err);
-            }
-          }
-          return next;
-        });
-      }
-
+      saveGoalAccount(editingGoal.id, editAccountId || '');
       setEditingGoal(null);
     } catch (err: any) {
       console.error('Error al actualizar meta:', err);
@@ -176,6 +152,7 @@ export default function GoalsPage() {
     try {
       const created = await createGoalMut({
         workspaceId: activeWorkspaceId,
+        accountId: selectedAccountId || undefined,
         name,
         targetAmount: parseFloat(targetAmount),
         currentAmount: currentAmount ? parseFloat(currentAmount) : 0,
@@ -1069,19 +1046,16 @@ export default function GoalsPage() {
                   if (linkedAcc.currency.toUpperCase() === gCurr.toUpperCase()) return null;
 
                   const parsedVal = parseFloat(depositAmount) || 0;
-                  const convertedAcc = convert(parsedVal, gCurr, linkedAcc.currency);
 
                   return (
-                    <div className="mt-2 p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-300">
-                      <div className="flex items-center justify-between">
-                        <span>Cuenta vinculada: <strong className="text-white">{linkedAcc.name}</strong></span>
-                        <span className="font-mono text-indigo-200">
-                          {parsedVal > 0 ? `≈ ${formatCurrency(convertedAcc, linkedAcc.currency)}` : `(${linkedAcc.currency})`}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-indigo-400/80 block mt-0.5">
-                        Al abonar {getCurrencySymbol(gCurr)} {depositAmount || '0'} a tu meta, se apartarán aprox. {formatCurrency(convertedAcc, linkedAcc.currency)} de tu saldo disponible en el banco.
-                      </span>
+                    <div className="mt-2.5">
+                      <CustomExchangeRateInput
+                        sourceCurrency={gCurr}
+                        targetCurrency={linkedAcc.currency}
+                        sourceAmount={parsedVal}
+                        accentColor="indigo"
+                        onRateChange={() => {}}
+                      />
                     </div>
                   );
                 })()}

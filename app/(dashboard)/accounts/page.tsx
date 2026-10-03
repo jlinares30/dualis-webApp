@@ -453,10 +453,9 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
                     }
                   }
 
-                  // Metas que están explícitamente vinculadas a esta cuenta
-                  // (o si no tiene vinculación pero coincide la divisa y es la única de esa divisa)
+                  // Metas que están explícitamente vinculadas a esta cuenta (prioriza g.accountId de la BD)
                   const matchingGoals = goals.filter((g) => {
-                    const linkedAccId = goalAccountMap[g.id];
+                    const linkedAccId = g.accountId || goalAccountMap[g.id];
                     if (linkedAccId) {
                       return linkedAccId === acc.id && g.currentAmount > 0;
                     }

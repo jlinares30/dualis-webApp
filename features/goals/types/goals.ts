@@ -1,6 +1,7 @@
 export interface SavingsGoalDTO {
   id: string;
   workspaceId: string;
+  accountId?: string;
   name: string;
   targetAmount: number;
   currentAmount: number;
@@ -13,6 +14,7 @@ export interface SavingsGoalDTO {
 
 export interface CreateGoalRequest {
   workspaceId: string;
+  accountId?: string;
   name: string;
   targetAmount: number;
   currentAmount?: number;
@@ -22,6 +24,7 @@ export interface CreateGoalRequest {
 }
 
 export interface UpdateGoalRequest {
+  accountId?: string;
   name?: string;
   targetAmount?: number;
   currentAmount?: number;
@@ -29,3 +32,4 @@ export interface UpdateGoalRequest {
   category?: 'EMERGENCY' | 'TRAVEL' | 'HOUSE' | 'CAR' | 'TECH' | 'OTHER';
   currency?: string;
 }
+
