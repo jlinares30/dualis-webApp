@@ -7,6 +7,7 @@ import { useCreateTransaction, useUpdateTransaction, useTransactions, useSplitRu
 import { useAccounts, useCreateAccount } from '@/hooks';
 import { useCategories, useCreateCategory } from '@/hooks';
 import { Transaction } from '../types/transactions';
+import { CustomExchangeRateInput } from '@/components/ui/custom-exchange-rate-input';
 
 interface CreateTransactionModalProps {
   isOpen: boolean;
@@ -36,6 +37,8 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
   const [selectedAccountId, setSelectedAccountId] = useState('');
   const [selectedTargetAccountId, setSelectedTargetAccountId] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [customConvertedTargetAmount, setCustomConvertedTargetAmount] = useState<number | null>(null);
+  const [customAppliedRate, setCustomAppliedRate] = useState<number | null>(null);
 
   const [isSplit, setIsSplit] = useState(hasPartner);
   const [splitMode, setSplitMode] = useState<DefaultSplitRule>(defaultSplitRule);
@@ -274,6 +277,11 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
           });
         } else {
           // Creación de nueva transacción
+          const isCross = isCrossCurrencyTransfer;
+          const effectiveRate = isCross
+            ? (customAppliedRate ?? (parsedAmount > 0 ? parseFloat((convertedTargetAmount / parsedAmount).toFixed(6)) : undefined))
+            : undefined;
+
           await createTx({
             workspaceId: effectiveWorkspaceId,
             accountId: targetAccountId,
@@ -282,7 +290,12 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
             amount: parseFloat(amount),
             currency: selectedAccount?.currency || 'PEN',
             type: txType,
-            description: title || defaultDesc,
+            description: title || (isCross && effectiveRate
+              ? `${defaultDesc} [TC: 1 ${currentCurrency} = ${effectiveRate} ${targetCurrency}]`
+              : defaultDesc),
+            exchangeRate: effectiveRate,
+            originalAmount: isCross ? parseFloat(amount) : undefined,
+            originalCurrency: isCross ? currentCurrency : undefined,
             transactionDate: selectedDateTime,
             splitRuleId: activeSplitRuleId,
           });
@@ -326,7 +339,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
     Boolean(selectedAccount && selectedTargetAccount && currentCurrency !== targetCurrency);
 
   const convertedTargetAmount = isCrossCurrencyTransfer
-    ? convert(parsedAmount, currentCurrency, targetCurrency)
+    ? (customConvertedTargetAmount !== null ? customConvertedTargetAmount : convert(parsedAmount, currentCurrency, targetCurrency))
     : parsedAmount;
 
   // Calculador dinámico según la regla seleccionada
@@ -557,27 +570,26 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
                 </div>
               </div>
 
-              {/* Aviso Inteligente de Transferencia Multidivisa */}
+              {/* Aviso Inteligente de Transferencia Multidivisa con Tasa Personalizable */}
               {isCrossCurrencyTransfer && (
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2 animate-in fade-in">
-                  <div className="flex items-start gap-2.5">
-                    <AlertCircle className="w-4 h-4 text-amber-400 mt-0.5 shrink-0" />
-                    <div>
-                      <span className="font-bold text-xs text-amber-300 block">
-                        Transferencia Multidivisa ({currentCurrency} ➔ {targetCurrency})
-                      </span>
-                      <p className="text-[11px] text-amber-200/80 leading-relaxed mt-0.5">
-                        Estás moviendo fondos entre cuentas con monedas diferentes. Se aplicará la conversión con tasa de cambio estimada.
-                      </p>
-                    </div>
-                  </div>
+                <div className="space-y-2 animate-in fade-in">
+                  <CustomExchangeRateInput
+                    sourceCurrency={currentCurrency}
+                    targetCurrency={targetCurrency}
+                    sourceAmount={parsedAmount}
+                    accentColor="indigo"
+                    onRateChange={(rate, computed) => {
+                      setCustomAppliedRate(rate);
+                      setCustomConvertedTargetAmount(computed);
+                    }}
+                  />
 
                   {parsedAmount > 0 && (
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-gray-900/80 border border-amber-500/20 text-xs">
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-gray-900/80 border border-indigo-500/20 text-xs">
                       <span className="text-gray-400">
                         Sale de {selectedAccount?.name}: <strong className="text-white">{currencySymbol} {parsedAmount.toFixed(2)}</strong>
                       </span>
-                      <span className="text-amber-400 font-bold">➔</span>
+                      <span className="text-indigo-400 font-bold">➔</span>
                       <span className="text-emerald-400 font-bold">
                         Llegará a {selectedTargetAccount?.name}: {targetCurrencySymbol} {convertedTargetAmount.toFixed(2)}
                       </span>

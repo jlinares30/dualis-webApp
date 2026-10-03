@@ -27,6 +27,9 @@ export interface TransactionDTO {
   currency: string;
   type: BackendTransactionType;
   description: string;
+  exchangeRate?: number;
+  originalAmount?: number;
+  originalCurrency?: string;
   transactionDate: string;
   paidByUserId?: string;
   paidByUserName?: string;
@@ -39,11 +42,14 @@ export interface CreateTransactionRequest {
   accountId: string;
   targetAccountId?: string;
   categoryId?: string;
-  categoryNature?: 'NEED' | 'WANT' | 'SAVINGS' | 'INVESTMENT' | 'DEBT';
+  categoryNature?: 'ESSENTIAL' | 'NON_ESSENTIAL' | string;
   amount: number;
   currency?: string;
   type: BackendTransactionType;
   description: string;
+  exchangeRate?: number;
+  originalAmount?: number;
+  originalCurrency?: string;
   transactionDate: string;
   splitRuleId?: string;
 }
@@ -64,6 +70,9 @@ export interface Transaction {
   accountName?: string;
   targetAccountId?: string;
   targetAccountName?: string;
+  exchangeRate?: number;
+  originalAmount?: number;
+  originalCurrency?: string;
   paidBy?: string;
   splitRatio?: string;
 }

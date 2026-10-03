@@ -31,6 +31,7 @@ interface ExchangeRateState {
   setRate: (currency: string, rateVsUsd: number) => void;
   setCustomRates: (newRates: ExchangeRates) => void;
   convert: (amount: number, fromCurrency: string, toCurrency: string) => number;
+  getRate: (fromCurrency: string, toCurrency: string) => number;
   fetchLiveRates: () => Promise<void>;
   resetToDefaults: () => void;
 }
@@ -78,6 +79,19 @@ export const useExchangeRateStore = create<ExchangeRateState>()(
         const result = amountInUsd * toRate;
 
         return Math.round((result + Number.EPSILON) * 100) / 100;
+      },
+
+      getRate: (fromCurrency: string, toCurrency: string): number => {
+        const from = (fromCurrency || 'USD').toUpperCase().trim();
+        const to = (toCurrency || 'USD').toUpperCase().trim();
+        if (from === to) return 1.0;
+
+        const rates = get().rates;
+        const fromRate = rates[from] || 1;
+        const toRate = rates[to] || 1;
+
+        const rate = (1 / fromRate) * toRate;
+        return Number(rate.toFixed(4));
       },
 
       fetchLiveRates: async () => {
