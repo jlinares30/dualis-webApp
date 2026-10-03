@@ -1,105 +1,154 @@
-# Dualis - Intelligent Finance Management
+# Dualis — Intelligent Financial Management for Individuals and Couples
 
-Dualis is a modern, full-stack web application designed for personal financial tracking and shared expense management. Built with Next.js (App Router), TypeScript, and Tailwind CSS, Dualis offers a seamless experience for managing individual budgets alongside shared partner finances through a unified, real-time dashboard interface.
+Dualis es una plataforma inteligente de gestion financiera personal y compartida para parejas y convivientes, disenada para resolver la friccion financiera con maxima transparencia, equidad, integridad contable y privacidad.
 
-## Key Features (Current MVP)
+Actualmente disponible en version web y con su aplicacion movil nativa (iOS y Android) en pleno desarrollo para un proximo lanzamiento.
 
-- **Context Switcher**: Effortlessly toggle between Personal Workspace and Shared Workspace to maintain clear financial boundaries.
-- **Proportional Income Split Engine**: Dynamic expense split calculation based on each partner's monthly income with asymmetric roles and write protection.
-- **Blind Proportion Mode (Privacy)**: Optional encrypted salary view (`•••••••••••• Confidential`) allowing couples to split costs proportionally without revealing exact income numbers to each other.
-- **Near Real-Time Synchronization**: Smart background polling that reflects partner updates, fixed commitments, and split transactions in 4–5 seconds without manual page refreshes.
-- **Financial Overview Metrics**: Real-time summary cards tracking available capital, monthly expenditure, and partner settlement balances.
-- **Fixed & Recurring Commitments**: Manage monthly recurring services, utilities, and subscriptions with payment status tracking and partner alerts.
-- **Visual Budget Health Widget**: Dynamic progress tracking categorized by expenditure thresholds with automated color coding (Healthy, Caution, Alert).
+Construida con la arquitectura de Next.js 16 (App Router), React 19, TypeScript y Tailwind CSS v4, Dualis ofrece un entorno agil con doble espacio financiero, motor de division dinamica y persistencia sincronizada en tiempo real mediante API REST.
 
-## Future Roadmap (Post-MVP Differentiators)
+---
 
-These innovative features are planned for future development milestones to differentiate Dualis from traditional expense splitters and budgeting apps:
+## 1. Principios Fundamentales del Producto
 
-1. **Instant QR Settlement (Yape / Plin / Local Banking)**
-   - One-click debt settlement generating dynamic QR codes (Yape, Plin) or auto-copying bank account credentials to clear partner balances in seconds.
-2. **Virtual Common Fund (Shared "Caja Chica")**
-   - Monthly upfront pooled contribution fund where all shared household expenses debit directly from the joint pool instead of relying on post-hoc reimbursement.
-3. **Couple Life Scenario Simulator**
-   - Interactive financial forecasting tool modeling major life changes (moving to a new apartment, taking a study sabbatical, long-term travel) with real-time affordability simulations.
-4. **AI Financial Mediator (Spending Arbitrator)**
-   - Neutral AI assistant evaluating disputed purchases against predefined household agreements to recommend fair expense categorization (individual vs. shared).
+1. **Doble Espacio Estricto (Dual Context):**
+   - **Espacio Individual (`personal` / `INDIVIDUAL`):** Privacidad 100% aislada. Cuentas bancarias privadas, gastos personales, inversiones y presupuestos individuales protegidos.
+   - **Espacio Compartido (`couple` / `COUPLE`):** Visualización transparente de gastos mutuos, cuentas mancomunadas, presupuestos del hogar y liquidación de deudas cruzadas.
+2. **Equidad Proporcional y Modo Privacidad Ciega (Blind Proportion Mode):**
+   - Motor dinámico de división de gastos (`PROPORTIONAL_INCOME`, `EQUALLY`, `PERCENTAGE`, `FIXED_AMOUNT`).
+   - Modo de privacidad ciega donde los porcentajes de aporte se calculan con exactitud matemática sin forzar a las partes a exponer sus sueldos exactos (`Confidential`).
+3. **Integridad Contable:**
+   - **Ahorro Patrimonial vs Gasto Operativo:** Los abonos a metas de ahorro (`SavingsGoal`) acumulan capital pero nunca se registran como gastos operativos (`EXPENSE`), protegiendo los presupuestos mensuales (`Budgets`).
+   - **Deducción de Saldo Libre:** En Cuentas se deduce el ahorro apartado para mostrar con precisión el saldo libre para gastar.
+   - **Soporte Multimoneda Real:** Normalización y conversión de divisas en tiempo real (`PEN`, `USD`, `EUR`, etc.) con tasas dinámicas y TTL automático de 12 horas.
 
-## Tech Stack
+---
 
-- **Framework**: [Next.js 16](https://nextjs.org/) (App Router)
-- **Language**: [TypeScript](https://www.typescriptlang.org/)
-- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
-- **Icons**: [Lucide React](https://lucide.dev/)
-- **State Management & Data Fetching**: [Zustand](https://github.com/pmndrs/zustand), [TanStack React Query](https://tanstack.com/query)
-- **Package Manager**: [pnpm](https://pnpm.io/)
+## 2. Funcionalidades Clave (MVP Completo)
 
-## Project Structure
+- **Dashboard Financiero Analytics:** Resumen de patrimonio neto personal o comparativa porcentual de pareja (`PartnerComparisonChart`), flujo de caja mensual y widgets interactivos.
+- **Cuentas y Billeteras:** Cuentas bancarias, efectivo, billeteras digitales y tarjetas de crédito con vinculación patrimonial a metas de ahorro.
+- **Transacciones y Auditoría:** Registro de ingresos, gastos y transferencias entre cuentas con filtros por categoría, búsqueda reactiva y exportación a CSV/Excel.
+- **Presupuestos Operativos:** Asignación mensual de topes de consumo por categoría con semaforización de salud financiera (Saludable, Alerta, Excedido) y desglose de movimientos.
+- **Metas de Ahorro y Objetivos:** Planificación patrimonial con metas vinculadas a cuentas de banco, cuotas mensuales proyectadas y seguimiento de avance visual.
+- **Gastos Fijos y Flujo de Sueldos:** Control de servicios recurrentes, pago de recibos variables y orquestación del flujo de distribución automática de sueldo hacia cuentas e inversiones.
+- **Inversiones y Rendimientos:** Seguimiento de portafolios (fondos mutuos, acciones, depósitos a plazo, cripto), cálculo de ROI multimoneda y liquidación a cuentas líquidas.
+- **Liquidación de Deudas Cruzadas:** Cálculo automatizado de balance entre cónyuges tras compras conjuntas, con impacto directo en cuentas personales y saldos netos.
+- **Gestión de Espacios y Vinculación:** Generación y canje de códigos de invitación únicos (8 caracteres) con control de roles (`OWNER` / `MEMBER`).
+- **Configuración y Preferencias:** Moneda predeterminada del usuario y monitor de tasas de cambio internacionales.
+
+---
+
+## 3. Stack Tecnologico
+
+| Capa | Tecnologia |
+|---|---|
+| **Framework Core** | Next.js 16 (App Router, Turbopack) |
+| **Runtime & UI Library** | React 19 |
+| **Lenguaje** | TypeScript 5 (Strict Mode) |
+| **Estilos & Diseno** | Tailwind CSS v4 (`@tailwindcss/postcss`) + `clsx` + `tailwind-merge` |
+| **Iconografia** | Lucide React |
+| **Visualizacion de Datos** | Recharts |
+| **Estado Global** | Zustand con persistencia segura |
+| **Gestion de Datos & Cache** | TanStack React Query v5 |
+| **Gestor de Paquetes** | pnpm (v9+) |
+
+---
+
+## 4. Estructura del Proyecto (Feature-Driven Architecture)
 
 ```text
-dualis-webapp/
-├── app/
-│   ├── (dashboard)/
-│   │   ├── layout.tsx         # Responsive dashboard layout (Sidebar + Header)
-│   │   └── page.tsx           # Main dashboard interface
-│   ├── globals.css            # Custom CSS theme tokens and layout styling
-│   └── page.tsx               # Application entry point
-├── components/
-│   ├── dashboard/
-│   │   ├── budget-widget.tsx       # Visual budget progress component
-│   │   ├── quick-actions.tsx       # Expense modal triggers and quick inputs
-│   │   ├── recent-transactions.tsx # Transaction history list
-│   │   └── summary-cards.tsx       # Financial metric cards
-│   └── layout/
-│       ├── header.tsx              # Context switcher and user notifications
-│       └── sidebar.tsx             # Main responsive navigation sidebar
-├── lib/
-│   └── utils.ts               # Shared utility functions and formatting helpers
-└── types/
-    └── finance.ts             # Domain interfaces and TypeScript declarations
+dualis-webApp/
+├── app/                              # Next.js App Router
+│   ├── (auth)/                       # Rutas publicas (login con Suspense, register)
+│   ├── (dashboard)/                  # Rutas autenticadas con Sidebar y Header compartido
+│   │   ├── accounts/                 # Gestion de cuentas y saldos libres
+│   │   ├── budgets/                  # Presupuestos por categoria y limites mensuales
+│   │   ├── goals/                    # Metas de ahorro patrimonial
+│   │   ├── investments/              # Inversiones y rendimientos (ROI)
+│   │   ├── settlements/              # Liquidacion de deudas de pareja
+│   │   ├── subscriptions/            # Gastos fijos y distribucion de sueldo
+│   │   ├── transactions/             # Historial y auditoria de transacciones
+│   │   ├── settings/                 # Perfil, preferencias y monitor de divisas
+│   │   ├── workspaces/               # Gestion de espacios y codigo de pareja
+│   │   ├── layout.tsx                # Layout principal autenticado
+│   │   └── page.tsx                  # Dashboard general analytics
+│   ├── globals.css                   # Tokens de diseno y temas oscuros
+│   └── layout.tsx                    # Root Layout con Providers (React Query, Auth)
+├── components/                       # Componentes compartidos globales
+│   ├── layout/                       # Sidebar (auto-filtro individual/pareja), Header
+│   └── ui/                           # Primitivas reutilizables
+├── features/                         # Modulos de dominio vertical (Feature Slices)
+│   ├── accounts/                     # Modales, hooks, servicios y tipos de cuentas
+│   ├── auth/                         # Sesion, perfil y onboarding
+│   ├── budgets/                      # Logica de presupuestos y auditoria por categoria
+│   ├── dashboard/                    # Widgets analiticos y graficos Recharts
+│   ├── goals/                        # Metas de ahorro y abonos patrimoniales
+│   ├── investments/                  # Rendimientos y liquidaciones
+│   ├── settlements/                  # Balance de deudas y pagos cruzados
+│   ├── subscriptions/                # Recibos, privacidad de sueldo y distribucion
+│   ├── transactions/                 # Registro y motor de division
+│   └── workspaces/                   # Invitacion y membresias
+├── lib/                              # Infraestructura del cliente
+│   ├── api.ts                        # Wrapper apiFetch y manejo unificado ApiError
+│   ├── auth.ts                       # Helpers de sesion y tokens
+│   ├── utils.ts                      # Formateador multimoneda formatCurrency, cn
+│   └── stores/                       # Zustand stores (Workspace, Auth, ExchangeRate con TTL)
+└── types/                            # Tipos globales de dominio
 ```
 
-## Getting Started
+---
 
-### Prerequisites
+## 5. Puesta en Marcha Local
 
-- Node.js 20.x or higher
-- pnpm 9.x or higher
+### Prerrequisitos
+- Node.js 20.x o superior
+- pnpm 9.x o superior
 
-### Installation
+### Paso 1: Clonar e Instalar Dependencias
+```bash
+git clone https://github.com/jlinares30/dualis-webApp.git
+cd dualis-webApp
+pnpm install
+```
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/jlinares30/dualis-webApp.git
-   cd dualis-webApp
-   ```
+### Paso 2: Variables de Entorno
+Crear un archivo `.env.local` en la raiz del proyecto:
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
+```
 
-2. Install dependencies:
-   ```bash
-   pnpm install
-   ```
+### Paso 3: Servidor de Desarrollo
+```bash
+pnpm dev
+```
+Abrir http://localhost:3000 en el navegador.
 
-3. Run the development server:
-   ```bash
-   pnpm dev
-   ```
+---
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser to view the application.
-
-## Build for Production
-
-To create an optimized production build:
+## 6. Comandos de Validacion y Calidad (QA)
 
 ```bash
-pnpm build
+# Verificacion estricta de tipos de TypeScript (0 errores)
+pnpm exec tsc --noEmit
+
+# Compilacion optimizada de produccion (Next.js App Router + Turbopack)
+pnpm run build
+
+# Ejecucion del servidor en modo produccion
 pnpm start
 ```
 
-## Roadmap / Futuras Funcionalidades (Post-MVP)
+---
 
-- **Notificaciones Push y por Correo al Desvincularse:** Aviso automático al email de la expareja notificando que el espacio conjunto fue cerrado y adjuntando el balance final.
-- **Exportación en PDF del Snapshot de Corte:** Generación descargable del acta o comprobante del corte de cuenta para saldar deudas pendientes fuera de la aplicación.
-- **Sincronización Bancaria Automática (Open Banking).**
-- **Reportes Financieros Anuales y Gráficos Comparativos Avanzados.**
+## 7. Roadmap Futuro (Post-MVP)
 
-Development by Jorge Linares
+1. **Aplicacion Movil Dualis (iOS y Android):** Actualmente en desarrollo activo para brindar experiencia nativa, notificaciones push inmediatas y widgets de pantalla de inicio.
+2. **Liquidacion Instantanea por QR (Yape / Plin / SPEI):** Generacion de QR dinamico y copiado rapido de cuenta CLABE/CCI para saldar deudas de pareja en un clic.
+3. **Caja Chica Virtual (Fondo Comun Compartido):** Aportacion anticipada mensual donde los gastos del hogar debitan de un fondo comun en vez de generar deuda posterior.
+4. **Simulador de Escenarios de Vida en Pareja:** Proyecciones ante hitos vitales (mudanza, viaje de larga estancia, ano sabatico).
+5. **Exportacion en PDF del Snapshot de Corte:** Generacion descargable de acta o comprobante del corte de cuenta al cerrar un ciclo o desvincularse.
+6. **Open Banking:** Sincronizacion bancaria automatica via APIs financieras seguras.
+
+---
+
+Desarrollado por [Jorge Linares](https://github.com/jlinares30)
