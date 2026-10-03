@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { 
   Receipt, 
@@ -27,7 +27,7 @@ import { useAccounts } from '@/features/accounts';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { getTransactionIconAndStyle } from '@/lib/transaction-icons';
 
-export default function TransactionsPage({ workspace }: { workspace?: WorkspaceType }) {
+function TransactionsContent({ workspace }: { workspace?: WorkspaceType }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const accountIdParam = searchParams.get('accountId') || undefined;
@@ -635,6 +635,20 @@ export default function TransactionsPage({ workspace }: { workspace?: WorkspaceT
         </div>
       )}
     </div>
+  );
+}
+
+export default function TransactionsPage({ workspace }: { workspace?: WorkspaceType }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-8 flex items-center justify-center">
+          <div className="w-8 h-8 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <TransactionsContent workspace={workspace} />
+    </Suspense>
   );
 }
 
