@@ -55,6 +55,7 @@ export default function SettingsPage() {
     rates,
     lastUpdated,
     isLoading: isLoadingRates,
+    error: ratesError,
     setRate,
     fetchLiveRates,
     resetToDefaults,
@@ -65,6 +66,7 @@ export default function SettingsPage() {
   const [newCurrencyRate, setNewCurrencyRate] = useState('');
   const [rateSearch, setRateSearch] = useState('');
   const [rateFeedback, setRateFeedback] = useState<string | null>(null);
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
 
   const {
     hasPartner,
@@ -117,6 +119,15 @@ export default function SettingsPage() {
       setPartnerInputName('');
     }
   }, [hasPartner, resolvedPartnerName]);
+
+  // Si existe un snapshot residual en localStorage pero el usuario actual nunca ha tenido pareja o pertenecía a otra cuenta:
+  useEffect(() => {
+    if (lastClosedSnapshot && user?.email) {
+      if (lastClosedSnapshot.userEmail && lastClosedSnapshot.userEmail.toLowerCase() !== user.email.toLowerCase()) {
+        clearClosedSnapshot();
+      }
+    }
+  }, [lastClosedSnapshot, user?.email, clearClosedSnapshot]);
 
   const [inviteCodeInput, setInviteCodeInput] = useState('');
   const [selectedRule, setSelectedRule] = useState<DefaultSplitRule>(defaultSplitRule);
@@ -224,6 +235,7 @@ export default function SettingsPage() {
     let calculatedSnapshot: ClosedWorkspaceSnapshot = {
       closedAt: new Date().toISOString(),
       workspaceId: activeWorkspaceId || '',
+      userEmail: currentUserEmail,
       partnerName: partnerDisplay,
       partnerEmail: storedPartnerEmail || undefined,
       netBalance: 0,
@@ -247,6 +259,7 @@ export default function SettingsPage() {
           calculatedSnapshot = {
             closedAt: new Date().toISOString(),
             workspaceId: activeWorkspaceId,
+            userEmail: currentUserEmail,
             partnerName: partnerDisplay,
             partnerEmail: storedPartnerEmail || undefined,
             netBalance: net,
@@ -366,30 +379,7 @@ export default function SettingsPage() {
         setIsMigratingBudgets(false);
       }
 
-      if (activeWorkspaceId) {
-        if (hasPartner) {
-          try {
-            const apiSplitType = selectedRule === 'PROPORTIONAL_INCOME' ? 'PROPORTIONAL'
-              : selectedRule === 'EQUALLY' ? 'EQUAL'
-                : selectedRule === 'PERCENTAGE' ? 'CUSTOM_PERCENTAGE'
-                  : 'EQUAL';
-
-            const payload: any = {
-              workspaceId: activeWorkspaceId,
-              name: `Regla por defecto ${selectedRule}`,
-              splitType: apiSplitType,
-              partnerAPercentage: selectedRule === 'EQUALLY' ? 50 : userPct,
-              partnerBPercentage: selectedRule === 'EQUALLY' ? 50 : 100 - userPct,
-              isDefault: true,
-            };
-
-            await createSplitRuleMut(payload);
-          } catch (ruleErr) {
-            console.error('Error al guardar regla de división en API:', ruleErr);
-          }
-        }
-      }
-
+      // Calcular porcentaje efectivo antes de guardar en la API y en el store
       let effectivePct = userPct;
       if (selectedRule === 'PROPORTIONAL_INCOME') {
         const sum = (userMonthlyIncome || 0) + (partnerMonthlyIncome || 0);
@@ -400,6 +390,30 @@ export default function SettingsPage() {
         }
       } else if (selectedRule === 'EQUALLY') {
         effectivePct = 50;
+      }
+
+      // Si existe un espacio de pareja vinculado, guardar la regla en dicho espacio
+      const coupleTargetWsId = coupleWs?.id || (hasPartner && activeWorkspaceId ? activeWorkspaceId : null);
+      if (coupleTargetWsId && hasPartner) {
+        try {
+          const apiSplitType = selectedRule === 'PROPORTIONAL_INCOME' ? 'PROPORTIONAL'
+            : selectedRule === 'EQUALLY' ? 'EQUAL'
+              : selectedRule === 'PERCENTAGE' ? 'CUSTOM_PERCENTAGE'
+                : 'EQUAL';
+
+          const payload: any = {
+            workspaceId: coupleTargetWsId,
+            name: `Regla por defecto ${selectedRule}`,
+            splitType: apiSplitType,
+            partnerAPercentage: effectivePct,
+            partnerBPercentage: 100 - effectivePct,
+            isDefault: true,
+          };
+
+          await createSplitRuleMut(payload);
+        } catch (ruleErr) {
+          console.error('Error al guardar regla de división en API:', ruleErr);
+        }
       }
 
       setDefaultSplitRule(selectedRule, effectivePct);
@@ -413,14 +427,14 @@ export default function SettingsPage() {
       setPendingCurrencyData(null);
       setAffectedBudgets([]);
 
+      setSaveErrorMessage(null);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error al actualizar perfil:', err);
-      setDefaultSplitRule(selectedRule, userPct);
       setIsMigratingBudgets(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      setSaved(false);
+      setSaveErrorMessage(err?.response?.data?.message || err?.message || 'Error al guardar los cambios en el servidor. Por favor, intenta nuevamente.');
     }
   };
 
@@ -482,6 +496,22 @@ export default function SettingsPage() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
+        {saveErrorMessage && (
+          <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center justify-between animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{saveErrorMessage}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSaveErrorMessage(null)}
+              className="p-1 text-rose-400 hover:text-white rounded-lg hover:bg-rose-500/20 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Profile Card */}
         <div className="rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 p-6 shadow-xl space-y-4">
           <div className="flex items-center gap-3 pb-3 border-b border-gray-800/60">
@@ -750,8 +780,8 @@ export default function SettingsPage() {
                 Actualmente estás usando Dualis en <strong className="text-white">Modo Individual</strong>. Puedes invitar a tu pareja generando un código único o unirte al espacio existente de tu pareja ingresando su código:
               </p>
 
-              {/* Snapshot Histórico de Último Corte de Cuenta (si existe) */}
-              {lastClosedSnapshot && (
+              {/* Snapshot Histórico de Último Corte de Cuenta (si existe y pertenece a este usuario) */}
+              {lastClosedSnapshot && (!lastClosedSnapshot.userEmail || (user?.email && lastClosedSnapshot.userEmail.toLowerCase() === user.email.toLowerCase())) && (
                 <div className="p-4 rounded-2xl bg-indigo-950/20 border border-indigo-500/30 space-y-3 relative overflow-hidden">
                   <div className="flex items-center justify-between border-b border-indigo-500/20 pb-2.5">
                     <div className="flex items-center gap-2">
@@ -1017,6 +1047,13 @@ export default function SettingsPage() {
           {rateFeedback && (
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400">
               {rateFeedback}
+            </div>
+          )}
+
+          {ratesError && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-300 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{ratesError}</span>
             </div>
           )}
 

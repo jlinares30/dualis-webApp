@@ -7,6 +7,7 @@ export type DefaultSplitRule = 'EQUALLY' | 'PROPORTIONAL_INCOME' | 'PERCENTAGE' 
 export interface ClosedWorkspaceSnapshot {
   closedAt: string;
   workspaceId: string;
+  userEmail?: string;
   partnerName: string;
   partnerEmail?: string;
   netBalance: number;
@@ -42,6 +43,7 @@ interface WorkspaceState {
   setDefaultSettlementAccountId: (accountId: string | null) => void;
   setMonthlyIncomes: (userIncome: number, partnerIncome: number) => void;
   updateWorkspaceCurrency: (workspaceId: string, currency: string) => void;
+  resetWorkspaceState: () => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()(
@@ -172,6 +174,21 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             defaultUserPercentage: calculatedPct,
           };
         }),
+      resetWorkspaceState: () =>
+        set(() => ({
+          activeWorkspaceId: null,
+          activeWorkspaceType: 'personal',
+          hasPartner: false,
+          partnerName: null,
+          partnerEmail: null,
+          lastClosedSnapshot: null,
+          defaultSplitRule: 'PROPORTIONAL_INCOME',
+          defaultUserPercentage: 50,
+          defaultSettlementAccountId: null,
+          userMonthlyIncome: 0,
+          partnerMonthlyIncome: 0,
+          workspaces: [],
+        })),
     }),
     {
       name: 'dualis-workspace-storage',
