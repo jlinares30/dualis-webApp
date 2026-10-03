@@ -171,7 +171,8 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
 
       {/* Right: Notifications & User Profile */}
       <div className="flex items-center gap-3">
-        {/* Notifications Button */}
+        {/* Feature Futura: Notificaciones en tiempo real */}
+        {/*
         <div className="relative">
           <button
             onClick={() => setNotificationsOpen(!notificationsOpen)}
@@ -209,6 +210,7 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
             </>
           )}
         </div>
+        */}
 
         {/* User Profile Avatar / Auth Trigger */}
         {isAuthenticated && user ? (
