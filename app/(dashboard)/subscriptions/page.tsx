@@ -76,12 +76,6 @@ export default function SubscriptionsPage() {
   const { data: coupleInvestmentsData = [] } = useInvestments(coupleWs?.id || undefined);
   const { mutateAsync: createTxMut } = useCreateTransaction();
 
-  // Helpers de persistencia scoped por usuario y workspace
-  const getSalaryStorageKey = (userId?: string, wsId?: string | null) =>
-    `dualis_salary_flow_${userId || 'guest'}_${wsId || 'default'}`;
-  const getPrivacyStorageKey = (userId?: string, wsId?: string | null) =>
-    `dualis_income_privacy_${userId || 'guest'}_${wsId || 'default'}`;
-
   // Función para confirmar el pago (con monto real si fue editado)
   const handleConfirmBillPayment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,75 +123,44 @@ export default function SubscriptionsPage() {
   // Estado para el flujo de distribución (colapsado por defecto)
   const [showDistributionFlow, setShowDistributionFlow] = useState(false);
   const [isExecutingDistribution, setIsExecutingDistribution] = useState(false);
-  const [salaryConfig, setSalaryConfig] = useState<SalaryDistributionConfig>(() => {
-    if (typeof window !== 'undefined') {
-      const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
-      const legacyKey = `dualis_salary_flow_${activeWorkspaceId}`;
-      const saved = localStorage.getItem(scopedKey) || localStorage.getItem(legacyKey);
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          // fallback
-        }
-      }
+  const [salaryConfig, setSalaryConfig] = useState<SalaryDistributionConfig>(() => ({
+    enabled: true,
+    frequency: 'MONTHLY',
+    paymentDay: 30,
+    distributionType: 'SPLIT',
+    branches: [],
+    autoExecute: false,
+  }));
+
+  // Re-sincronizar salaryConfig cuando cambie el backendSalaryConfig o el workspace activo
+  useEffect(() => {
+    if (backendSalaryConfig) {
+      setSalaryConfig(backendSalaryConfig);
+      return;
     }
-    return {
+
+    setSalaryConfig({
       enabled: true,
       frequency: 'MONTHLY',
       paymentDay: 30,
       distributionType: 'SPLIT',
       branches: [],
       autoExecute: false,
-    };
-  });
-
-  // Re-sincronizar salaryConfig cuando cambie el backendSalaryConfig, el workspace activo o el usuario
-  useEffect(() => {
-    if (backendSalaryConfig) {
-      setSalaryConfig(backendSalaryConfig);
-      if (typeof window !== 'undefined' && activeWorkspaceId) {
-        const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
-        localStorage.setItem(scopedKey, JSON.stringify(backendSalaryConfig));
-      }
-      return;
-    }
-
-    if (typeof window !== 'undefined' && activeWorkspaceId) {
-      const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
-      const legacyKey = `dualis_salary_flow_${activeWorkspaceId}`;
-      const saved = localStorage.getItem(scopedKey) || localStorage.getItem(legacyKey);
-      if (saved) {
-        try {
-          setSalaryConfig(JSON.parse(saved));
-          return;
-        } catch {
-          // fallback
-        }
-      }
-      setSalaryConfig({
-        enabled: true,
-        frequency: 'MONTHLY',
-        paymentDay: 30,
-        distributionType: 'SPLIT',
-        branches: [],
-        autoExecute: false,
-      });
-    }
-  }, [backendSalaryConfig, activeWorkspaceId, user?.id]);
+    });
+  }, [backendSalaryConfig, activeWorkspaceId]);
 
   const handleSaveSalaryConfig = async (newConfig: SalaryDistributionConfig) => {
     setSalaryConfig(newConfig);
-    if (typeof window !== 'undefined' && activeWorkspaceId) {
-      const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
-      localStorage.setItem(scopedKey, JSON.stringify(newConfig));
-    }
 
     // Persistir en backend
     try {
-      await saveSalaryConfigMut(newConfig);
+      await saveSalaryConfigMut({
+        ...newConfig,
+        workspaceId: activeWorkspaceId,
+        userEmail: user?.email,
+      });
     } catch (err) {
-      console.warn('No se pudo guardar la configuración de sueldo en el servidor, usando almacenamiento local:', err);
+      console.error('Error al guardar la configuración de sueldo en el servidor:', err);
     }
   };
 
@@ -404,12 +367,12 @@ export default function SubscriptionsPage() {
       await handleExecuteSalaryDistribution(pendingAutoExecution.targets);
       const updatedConfig = { ...salaryConfig, lastExecutedDate: pendingAutoExecution.yearMonth };
       setSalaryConfig(updatedConfig);
-      if (typeof window !== 'undefined' && activeWorkspaceId) {
-        const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
-        localStorage.setItem(scopedKey, JSON.stringify(updatedConfig));
-      }
       try {
-        await saveSalaryConfigMut(updatedConfig);
+        await saveSalaryConfigMut({
+          ...updatedConfig,
+          workspaceId: activeWorkspaceId,
+          userEmail: user?.email,
+        });
       } catch (err) {
         console.warn('Error al actualizar lastExecutedDate en el backend:', err);
       }
@@ -427,12 +390,12 @@ export default function SubscriptionsPage() {
     if (!pendingAutoExecution) return;
     const updatedConfig = { ...salaryConfig, lastExecutedDate: pendingAutoExecution.yearMonth };
     setSalaryConfig(updatedConfig);
-    if (typeof window !== 'undefined' && activeWorkspaceId) {
-      const scopedKey = getSalaryStorageKey(user?.id, activeWorkspaceId);
-      localStorage.setItem(scopedKey, JSON.stringify(updatedConfig));
-    }
     try {
-      await saveSalaryConfigMut(updatedConfig);
+      await saveSalaryConfigMut({
+        ...updatedConfig,
+        workspaceId: activeWorkspaceId,
+        userEmail: user?.email,
+      });
     } catch (err) {
       console.warn('Error al actualizar lastExecutedDate en el backend:', err);
     }
@@ -467,17 +430,8 @@ export default function SubscriptionsPage() {
     };
   };
 
-  // Cargar regla y banderas de privacidad sincronizadas desde el backend con fallback a localStorage scoped
+  // Cargar regla y banderas de privacidad sincronizadas desde el backend
   useEffect(() => {
-    const privacyKey = getPrivacyStorageKey(user?.id, activeWorkspaceId);
-    let savedLocalPrivacy: boolean | null = null;
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(privacyKey);
-      if (stored !== null) {
-        savedLocalPrivacy = stored === 'true';
-      }
-    }
-
     if (splitRules && splitRules.length > 0) {
       const defaultRule = splitRules.find((r) => r.isDefault || r.splitType === 'PROPORTIONAL') || splitRules[0];
       if (defaultRule) {
@@ -486,8 +440,7 @@ export default function SubscriptionsPage() {
 
         const { hideA, hideB } = parsePrivacyFlags(defaultRule.name);
 
-        // Si la regla en el backend no tiene la bandera, recurrir al localStorage scoped del usuario
-        const myHide = (isOwner ? hideA : hideB) ?? savedLocalPrivacy ?? false;
+        const myHide = (isOwner ? hideA : hideB) ?? false;
         const partnerHide = (isOwner ? hideB : hideA) ?? false;
 
         setPartnerHidesFromMe(partnerHide);
@@ -509,20 +462,11 @@ export default function SubscriptionsPage() {
           setHasInitializedInputs(true);
         }
       }
-    } else if (!hasInitializedInputs && savedLocalPrivacy !== null) {
-      setHideIncomeFromPartner(savedLocalPrivacy);
     }
-  }, [splitRules, hasInitializedInputs, isOwner, setMonthlyIncomes, user?.id, activeWorkspaceId]);
+  }, [splitRules, hasInitializedInputs, isOwner, setMonthlyIncomes]);
 
   const toggleHideIncome = () => {
-    setHideIncomeFromPartner((prev) => {
-      const next = !prev;
-      if (typeof window !== 'undefined') {
-        const privacyKey = getPrivacyStorageKey(user?.id, activeWorkspaceId);
-        localStorage.setItem(privacyKey, String(next));
-      }
-      return next;
-    });
+    setHideIncomeFromPartner((prev) => !prev);
   };
 
   const handleSaveIncomes = async (e: React.FormEvent) => {
@@ -531,12 +475,6 @@ export default function SubscriptionsPage() {
     const partnerInc = parseFloat(partnerIncomeInput) || 0;
     setMonthlyIncomes(myInc, partnerInc);
     setIsSavingIncome(true);
-
-    // Guardar preferencia de privacidad en localStorage scoped
-    if (typeof window !== 'undefined') {
-      const privacyKey = getPrivacyStorageKey(user?.id, activeWorkspaceId);
-      localStorage.setItem(privacyKey, String(hideIncomeFromPartner));
-    }
 
     if (activeWorkspaceId) {
       try {
