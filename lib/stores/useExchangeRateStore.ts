@@ -21,6 +21,9 @@ const DEFAULT_RATES_VS_USD: ExchangeRates = {
   JPY: 155.0,
 };
 
+// TTL de 12 horas para refresco automático de tasas en caché
+const RATES_CACHE_TTL_MS = 1000 * 60 * 60 * 12;
+
 interface ExchangeRateState {
   rates: ExchangeRates; // Valores relativos a 1 USD
   lastUpdated: string | null;
@@ -33,6 +36,7 @@ interface ExchangeRateState {
   convert: (amount: number, fromCurrency: string, toCurrency: string) => number;
   getRate: (fromCurrency: string, toCurrency: string) => number;
   fetchLiveRates: () => Promise<void>;
+  checkAndRefreshRates: () => Promise<void>;
   resetToDefaults: () => void;
 }
 
@@ -124,6 +128,16 @@ export const useExchangeRateStore = create<ExchangeRateState>()(
         }
       },
 
+      checkAndRefreshRates: async () => {
+        const { lastUpdated, isLoading } = get();
+        if (isLoading) return;
+
+        const isExpired = !lastUpdated || Date.now() - new Date(lastUpdated).getTime() > RATES_CACHE_TTL_MS;
+        if (isExpired) {
+          await get().fetchLiveRates();
+        }
+      },
+
       resetToDefaults: () => {
         set({
           rates: DEFAULT_RATES_VS_USD,
@@ -134,6 +148,11 @@ export const useExchangeRateStore = create<ExchangeRateState>()(
     }),
     {
       name: 'dualis-exchange-rates',
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.checkAndRefreshRates();
+        }
+      },
     }
   )
 );

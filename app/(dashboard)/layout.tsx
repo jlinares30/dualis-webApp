@@ -9,6 +9,7 @@ import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaces, useAccounts } from '@/hooks';
 import { useUserProfile } from '@/features/auth/hooks/useUserProfile';
+import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 import { OnboardingModal } from '@/features/onboarding';
 
 export default function DashboardLayout({
@@ -30,10 +31,12 @@ export default function DashboardLayout({
 
   const { activeWorkspaceType, activeWorkspaceId, switchWorkspaceType, hasPartner, workspaces } = useWorkspaceStore();
   const { isAuthenticated, token, user, setUser } = useAuthStore();
+  const checkAndRefreshRates = useExchangeRateStore((s) => s.checkAndRefreshRates);
 
   useEffect(() => {
     setIsMounted(true);
-  }, []);
+    checkAndRefreshRates();
+  }, [checkAndRefreshRates]);
 
   // Si el perfil remoto llega y tiene campos actualizados, sincronizar con el store local
   useEffect(() => {
