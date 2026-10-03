@@ -5,6 +5,7 @@ import {
   updateInvestment,
   deleteInvestment, 
   CreateInvestmentRequest, 
+  UpdateInvestmentRequest,
   InvestmentDTO 
 } from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
@@ -41,7 +42,7 @@ export function useUpdateInvestment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => updateInvestment(id, data),
+    mutationFn: ({ id, data }: { id: string; data: UpdateInvestmentRequest }) => updateInvestment(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investments'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });

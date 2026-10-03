@@ -6,6 +6,8 @@ import { useCreateInvestment, useAccounts, useCreateTransaction } from '@/hooks'
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 
+import { CustomExchangeRateInput } from '@/components/ui/custom-exchange-rate-input';
+
 interface CreateInvestmentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -27,21 +29,31 @@ export function CreateInvestmentModal({ isOpen, onClose }: CreateInvestmentModal
   const [initialCapital, setInitialCapital] = useState('');
   const [currentValue, setCurrentValue] = useState('');
 
+  const [onlySameCurrency, setOnlySameCurrency] = useState(false);
+  const [customComputedDeduct, setCustomComputedDeduct] = useState<number | null>(null);
+
   // Estado para Fondeo desde Cuenta Bancaria / Líquida
   // Ordenamos para priorizar cuentas de la misma divisa pero permitiendo seleccionar cualquiera con conversión libre
   const liquidAccounts = React.useMemo(() => {
     const list = (apiAccounts || []).filter(
       (a) => a.status !== 'ARCHIVED' && a.type?.toUpperCase() !== 'INVESTMENT'
     );
-    return list.sort((a, b) => {
+    const filtered = onlySameCurrency
+      ? list.filter((a) => (a.currency || workspaceCurrency) === currency)
+      : list;
+
+    return filtered.sort((a, b) => {
       const aMatch = (a.currency || workspaceCurrency) === currency ? 1 : 0;
       const bMatch = (b.currency || workspaceCurrency) === currency ? 1 : 0;
       return bMatch - aMatch;
     });
-  }, [apiAccounts, currency, workspaceCurrency]);
+  }, [apiAccounts, currency, workspaceCurrency, onlySameCurrency]);
 
-  const [deductFromAccount, setDeductFromAccount] = useState(liquidAccounts.length > 0);
+  const [deductFromAccount, setDeductFromAccount] = useState(true);
   const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [appliedExchangeRate, setAppliedExchangeRate] = useState<number | null>(null);
+
+  const [error, setError] = useState<string | null>(null);
 
   // Sincronizar cuenta seleccionada si cambia la lista o la divisa
   React.useEffect(() => {
@@ -49,6 +61,14 @@ export function CreateInvestmentModal({ isOpen, onClose }: CreateInvestmentModal
       setSelectedAccountId(liquidAccounts[0].id);
     }
   }, [liquidAccounts, selectedAccountId]);
+
+  // Limpiar errores y resetear cuenta al abrir el modal
+  React.useEffect(() => {
+    if (isOpen) {
+      setError(null);
+      setCustomComputedDeduct(null);
+    }
+  }, [isOpen]);
 
   const COMMON_CURRENCIES = ['PEN', 'USD', 'EUR', 'COP', 'MXN', 'CLP', 'ARS', 'BRL'];
 
@@ -65,18 +85,45 @@ export function CreateInvestmentModal({ isOpen, onClose }: CreateInvestmentModal
 
   let amountToDeduct = parsedCapital;
   if (originAccount && originCurrency !== currency && parsedCapital > 0) {
-    amountToDeduct = parseFloat(convert(parsedCapital, currency, originCurrency).toFixed(2));
+    amountToDeduct =
+      customComputedDeduct !== null
+        ? customComputedDeduct
+        : parseFloat(convert(parsedCapital, currency, originCurrency).toFixed(2));
   }
+
+  const isInsufficientBalance = Boolean(
+    deductFromAccount && originAccount && originAccount.balance < amountToDeduct
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !initialCapital) return;
+    setError(null);
 
+    if (!name.trim()) {
+      setError('El nombre de la inversión es obligatorio.');
+      return;
+    }
+    if (parsedCapital <= 0) {
+      setError('El capital invertido debe ser mayor a 0.');
+      return;
+    }
+
+    // Validación de fondos suficientes en cuenta bancaria seleccionada
+    if (deductFromAccount && originAccount) {
+      if (originAccount.balance < amountToDeduct) {
+        setError(
+          `Saldo insuficiente en ${originAccount.name}. Saldo disponible: ${originAccount.balance.toLocaleString()} ${originCurrency}, requerido: ${amountToDeduct.toLocaleString()} ${originCurrency}`
+        );
+        return;
+      }
+    }
+
+    let createdInv: { id: string } | null = null;
     try {
       // 1. Crear la Inversión en el portafolio
-      await createInv({
-        name,
-        institution: institution || 'Entidad Financiera',
+      createdInv = await createInv({
+        name: name.trim(),
+        institution: institution.trim() || 'Entidad Financiera',
         type,
         initialCapital: parsedCapital,
         currentValue: currentValue ? parseFloat(currentValue) : parsedCapital,
@@ -87,18 +134,39 @@ export function CreateInvestmentModal({ isOpen, onClose }: CreateInvestmentModal
       // 2. Si el usuario marcó descontar de cuenta líquida, crear la transacción de salida (FONDEO DE INVERSIÓN)
       if (deductFromAccount && originAccount && parsedCapital > 0) {
         try {
+          const isCrossCurrency = originCurrency !== currency;
+          const rateToSave = isCrossCurrency
+            ? (appliedExchangeRate ?? (parsedCapital > 0 ? parseFloat((amountToDeduct / parsedCapital).toFixed(6)) : undefined))
+            : undefined;
+
           await createTxMut({
             workspaceId: originAccount.workspaceId || activeWorkspaceId!,
             accountId: originAccount.id,
             amount: amountToDeduct,
             currency: originCurrency,
             type: 'EXPENSE',
-            categoryNature: 'INVESTMENT',
-            description: `Fondeo de inversión: ${name} (${institution || 'Portafolio'})`,
+            categoryNature: 'NON_ESSENTIAL',
+            description: isCrossCurrency && rateToSave
+              ? `Fondeo de inversión: ${name.trim()} (${institution.trim() || 'Portafolio'}) [TC: 1 ${currency} = ${rateToSave} ${originCurrency}]`
+              : `Fondeo de inversión: ${name.trim()} (${institution.trim() || 'Portafolio'})`,
+            exchangeRate: rateToSave,
+            originalAmount: isCrossCurrency ? parsedCapital : undefined,
+            originalCurrency: isCrossCurrency ? currency : undefined,
             transactionDate: new Date().toISOString(),
           });
-        } catch (txErr) {
+        } catch (txErr: any) {
           console.error('Error al registrar transacción de débito de cuenta:', txErr);
+          // Rollback: revertir la creación de la inversión si falla el débito de la cuenta para no dejar registros huérfanos
+          if (createdInv?.id) {
+            try {
+              const { deleteInvestment } = await import('@/lib/services');
+              await deleteInvestment(createdInv.id);
+            } catch (delErr) {
+              console.error('Error al revertir creación de inversión huérfana:', delErr);
+            }
+          }
+          setError(txErr?.message || 'Error al descontar los fondos de tu cuenta bancaria. Operación cancelada.');
+          return;
         }
       }
 
@@ -107,10 +175,12 @@ export function CreateInvestmentModal({ isOpen, onClose }: CreateInvestmentModal
       setInitialCapital('');
       setCurrentValue('');
       setCurrency(workspaceCurrency);
+      setAppliedExchangeRate(null);
+      setError(null);
       onClose();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error al registrar inversión:', err);
-      onClose();
+      setError(err?.message || 'Error al registrar la inversión en el servidor.');
     }
   };
 
@@ -133,6 +203,12 @@ export function CreateInvestmentModal({ isOpen, onClose }: CreateInvestmentModal
             <p className="text-xs text-gray-400">Registra un fondo, plazo fijo, acciones o cripto</p>
           </div>
         </div>
+
+        {error && (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-3.5 pt-2">
           <div>
@@ -241,9 +317,22 @@ export function CreateInvestmentModal({ isOpen, onClose }: CreateInvestmentModal
 
             {deductFromAccount && (
               <div className="space-y-2 pt-1 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] text-gray-400">Cuenta de origen:</label>
+                  <label className="flex items-center gap-1.5 text-[10px] text-gray-400 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={onlySameCurrency}
+                      onChange={(e) => setOnlySameCurrency(e.target.checked)}
+                      className="rounded border-gray-700 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 cursor-pointer"
+                    />
+                    <span>Solo cuentas en {currency}</span>
+                  </label>
+                </div>
+
                 {liquidAccounts.length === 0 ? (
-                  <p className="text-[11px] text-amber-400/90">
-                    No tienes cuentas disponibles para descontar fondos.
+                  <p className="text-[11px] text-amber-400/90 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                    No tienes cuentas {onlySameCurrency ? `en ${currency}` : ''} disponibles para descontar fondos.
                   </p>
                 ) : (
                   <>
@@ -260,11 +349,20 @@ export function CreateInvestmentModal({ isOpen, onClose }: CreateInvestmentModal
                     </select>
 
                     {originCurrency !== currency && parsedCapital > 0 && (
-                      <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-300">
-                        <span>Se debitará de la cuenta:</span>
-                        <span className="font-bold font-mono">
-                          {amountToDeduct.toLocaleString()} {originCurrency}
-                        </span>
+                      <CustomExchangeRateInput
+                        sourceCurrency={currency}
+                        targetCurrency={originCurrency}
+                        sourceAmount={parsedCapital}
+                        accentColor="emerald"
+                        onRateChange={(rate, computed) => {
+                          setAppliedExchangeRate(rate);
+                          setCustomComputedDeduct(computed);
+                        }}
+                      />
+                    )}
+                    {isInsufficientBalance && (
+                      <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-300">
+                        ⚠️ Saldo insuficiente en la cuenta seleccionada.
                       </div>
                     )}
                   </>
@@ -283,7 +381,7 @@ export function CreateInvestmentModal({ isOpen, onClose }: CreateInvestmentModal
             </button>
             <button
               type="submit"
-              disabled={isPending}
+              disabled={isPending || isInsufficientBalance}
               className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors shadow-lg shadow-emerald-600/30 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {isPending ? (

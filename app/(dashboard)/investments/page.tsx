@@ -15,13 +15,15 @@ import {
   Trash2,
   X,
   RefreshCw,
-  AlertTriangle
+  AlertTriangle,
+  Search
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { useInvestments, useUpdateInvestment, useDeleteInvestment, CreateInvestmentModal, InvestmentDTO } from '@/features/investments';
 import { useAccounts, useCreateTransaction } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
+import { CustomExchangeRateInput } from '@/components/ui/custom-exchange-rate-input';
 
 const COMMON_CURRENCIES = ['PEN', 'USD', 'EUR', 'COP', 'MXN', 'CLP', 'ARS', 'BRL'];
 
@@ -46,9 +48,12 @@ export default function InvestmentsPage() {
   const [editingInv, setEditingInv] = useState<InvestmentDTO | null>(null);
   const [editName, setEditName] = useState('');
   const [editInstitution, setEditInstitution] = useState('');
+  const [editType, setEditType] = useState<string>('MUTUAL_FUNDS');
   const [editCurrentValue, setEditCurrentValue] = useState('');
   const [editInitialCapital, setEditInitialCapital] = useState('');
   const [editCurrency, setEditCurrency] = useState('PEN');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Estado para Confirmación y Liquidación de Inversión
   const liquidAccounts = (apiAccounts || []).filter(
@@ -57,8 +62,22 @@ export default function InvestmentsPage() {
   const [deletingInv, setDeletingInv] = useState<InvestmentDTO | null>(null);
   const [depositToAccountOnDelete, setDepositToAccountOnDelete] = useState(false);
   const [destinationAccountId, setDestinationAccountId] = useState('');
+  const [liquidationCustomComputed, setLiquidationCustomComputed] = useState<number | null>(null);
+  const [liquidationAppliedRate, setLiquidationAppliedRate] = useState<number | null>(null);
+
+  // Filtro y búsqueda
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string>('ALL');
 
   const investments = apiInvestments || [];
+
+  const filteredInvestments = investments.filter((inv) => {
+    const matchesSearch =
+      inv.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (inv.institution && inv.institution.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesType = selectedTypeFilter === 'ALL' || inv.type === selectedTypeFilter;
+    return matchesSearch && matchesType;
+  });
 
   // Convertir cada activo a la moneda base del espacio para calcular totales consolidados correctos
   const totalCapital = investments.reduce((acc, curr) => {
@@ -81,28 +100,33 @@ export default function InvestmentsPage() {
     setEditingInv(inv);
     setEditName(inv.name);
     setEditInstitution(inv.institution || '');
+    setEditType(inv.type || 'MUTUAL_FUNDS');
     setEditCurrentValue((inv.currentValue ?? inv.initialCapital ?? 0).toString());
     setEditInitialCapital((inv.initialCapital ?? 0).toString());
     setEditCurrency(inv.currency || currency);
+    setEditError(null);
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingInv || !editName) return;
 
+    setEditError(null);
     try {
       await updateInvMut({
         id: editingInv.id,
         data: {
           name: editName,
           institution: editInstitution || 'Entidad Financiera',
+          type: editType,
           initialCapital: parseFloat(editInitialCapital) || 0,
           currentValue: parseFloat(editCurrentValue) || 0,
         },
       });
       setEditingInv(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error al actualizar inversión:', err);
+      setEditError(err?.message || 'Error al actualizar los datos de la inversión');
     }
   };
 
@@ -112,22 +136,37 @@ export default function InvestmentsPage() {
     const matching = liquidAccounts.find((a) => a.currency === inv.currency);
     setDestinationAccountId(matching ? matching.id : liquidAccounts[0]?.id || '');
     setDepositToAccountOnDelete(false);
+    setLiquidationCustomComputed(null);
+    setLiquidationAppliedRate(null);
+    setDeleteError(null);
   };
 
   const handleDelete = async () => {
     if (!deletingInv) return;
+    setDeleteError(null);
     try {
       const invCurrentVal = deletingInv.currentValue ?? deletingInv.initialCapital ?? 0;
       const targetAccount = liquidAccounts.find((a) => a.id === destinationAccountId);
 
-      // Si el usuario eligió liquidar y depositar los fondos en una cuenta bancaria
+      // 1. Eliminar primero la inversión para asegurar atomicidad e integridad
+      await deleteInvMut(deletingInv.id);
+
+      // 2. Si se eliminó exitosamente y se solicitó liquidar en cuenta bancaria, registrar el abono
       if (depositToAccountOnDelete && targetAccount && invCurrentVal > 0) {
         const invCurr = deletingInv.currency || currency;
         const targetCurr = targetAccount.currency || currency;
+        const isCross = targetCurr !== invCurr;
+
         let depositVal = invCurrentVal;
-        if (targetCurr !== invCurr) {
-          depositVal = parseFloat(convert(invCurrentVal, invCurr, targetCurr).toFixed(2));
+        if (isCross) {
+          depositVal = liquidationCustomComputed !== null
+            ? liquidationCustomComputed
+            : parseFloat(convert(invCurrentVal, invCurr, targetCurr).toFixed(2));
         }
+
+        const effectiveRate = isCross
+          ? (liquidationAppliedRate ?? (invCurrentVal > 0 ? parseFloat((depositVal / invCurrentVal).toFixed(6)) : undefined))
+          : undefined;
 
         try {
           await createTxMut({
@@ -136,8 +175,13 @@ export default function InvestmentsPage() {
             amount: depositVal,
             currency: targetCurr,
             type: 'INCOME',
-            categoryNature: 'INVESTMENT',
-            description: `Liquidación de inversión: ${deletingInv.name} (${deletingInv.institution || 'Portafolio'})`,
+            categoryNature: 'NON_ESSENTIAL',
+            description: isCross && effectiveRate
+              ? `Liquidación de inversión: ${deletingInv.name} (${deletingInv.institution || 'Portafolio'}) [TC: 1 ${invCurr} = ${effectiveRate} ${targetCurr}]`
+              : `Liquidación de inversión: ${deletingInv.name} (${deletingInv.institution || 'Portafolio'})`,
+            exchangeRate: effectiveRate,
+            originalAmount: isCross ? invCurrentVal : undefined,
+            originalCurrency: isCross ? invCurr : undefined,
             transactionDate: new Date().toISOString(),
           });
         } catch (txErr) {
@@ -145,10 +189,10 @@ export default function InvestmentsPage() {
         }
       }
 
-      await deleteInvMut(deletingInv.id);
       setDeletingInv(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error al eliminar inversión:', err);
+      setDeleteError(err?.message || 'No se pudo eliminar la inversión. Intenta nuevamente.');
     }
   };
 
@@ -213,6 +257,49 @@ export default function InvestmentsPage() {
         </div>
       </div>
 
+      {/* Filters and Search Bar */}
+      {investments.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            {[
+              { id: 'ALL', label: 'Todos' },
+              { id: 'MUTUAL_FUNDS', label: 'Fondos' },
+              { id: 'FIXED_TERM', label: 'Plazo Fijo' },
+              { id: 'STOCKS', label: 'Acciones/ETFs' },
+              { id: 'CRYPTO', label: 'Cripto' },
+              { id: 'CROWDLENDING', label: 'Facturas' },
+              { id: 'REAL_ESTATE', label: 'Inmuebles' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setSelectedTypeFilter(tab.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  selectedTypeFilter === tab.id
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow'
+                    : 'bg-gray-900/80 text-gray-400 hover:text-white border border-gray-800'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Search Box */}
+          <div className="relative min-w-[220px]">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por nombre o banco..."
+              className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-gray-900/90 border border-gray-800 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500 transition-colors"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Grid of Investment Assets */}
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -236,9 +323,15 @@ export default function InvestmentsPage() {
             <Plus className="w-4 h-4" /> Registrar mi primera inversión
           </button>
         </div>
+      ) : filteredInvestments.length === 0 ? (
+        <div className="text-center py-10 rounded-2xl bg-[#0f172a]/40 border border-gray-800/40 space-y-2">
+          <Search className="w-8 h-8 text-gray-500 mx-auto" />
+          <h3 className="font-bold text-xs text-gray-300">No se encontraron inversiones con esos criterios</h3>
+          <p className="text-[11px] text-gray-500">Prueba ajustando el texto de búsqueda o el filtro de categoría.</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {investments.map((inv) => {
+          {filteredInvestments.map((inv) => {
             const invCurrency = inv.currency || currency;
             const capital = inv.initialCapital || 0;
             const current = inv.currentValue ?? capital;
@@ -298,9 +391,16 @@ export default function InvestmentsPage() {
                 <div className="pt-3 border-t border-gray-800/80 space-y-1.5">
                   <div className="flex justify-between items-baseline text-xs">
                     <span className="text-gray-400">Valor Actual</span>
-                    <span className="font-bold text-base text-white font-mono">
-                      {formatCurrency(current, invCurrency)}
-                    </span>
+                    <div className="text-right">
+                      <span className="font-bold text-base text-white font-mono block">
+                        {formatCurrency(current, invCurrency)}
+                      </span>
+                      {invCurrency !== currency && (
+                        <span className="text-[10px] text-gray-500 font-mono">
+                          ≈ {formatCurrency(convert(current, invCurrency, currency), currency)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex justify-between items-center text-[11px]">
                     <span className="text-gray-500">Capital: {formatCurrency(capital, invCurrency)}</span>
@@ -404,6 +504,28 @@ export default function InvestmentsPage() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">Tipo de Activo</label>
+                <select
+                  value={editType}
+                  onChange={(e) => setEditType(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="MUTUAL_FUNDS">Fondos Mutuos</option>
+                  <option value="FIXED_TERM">Plazo Fijo</option>
+                  <option value="STOCKS">Acciones / ETFs</option>
+                  <option value="CRYPTO">Criptomonedas</option>
+                  <option value="CROWDLENDING">Facturaje / Facturas</option>
+                  <option value="REAL_ESTATE">Bienes Raíces</option>
+                </select>
+              </div>
+
+              {editError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300">
+                  {editError}
+                </div>
+              )}
+
               <div className="flex gap-3 pt-3">
                 <button
                   type="button"
@@ -472,20 +594,38 @@ export default function InvestmentsPage() {
                     ))}
                   </select>
 
-                  {/* Previsualización de conversión de divisa en liquidación */}
+                  {/* Previsualización de conversión de divisa en liquidación con tipo de cambio editable */}
                   {(() => {
                     const targetAcc = liquidAccounts.find((a) => a.id === destinationAccountId);
                     const invCurr = deletingInv.currency || currency;
                     const targetCurr = targetAcc?.currency || currency;
                     const invVal = deletingInv.currentValue ?? deletingInv.initialCapital ?? 0;
-                    const convertedVal = targetCurr !== invCurr ? convert(invVal, invCurr, targetCurr) : invVal;
+                    const isCross = targetCurr !== invCurr;
+                    const convertedVal = isCross
+                      ? (liquidationCustomComputed !== null ? liquidationCustomComputed : convert(invVal, invCurr, targetCurr))
+                      : invVal;
 
                     return (
-                      <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
-                        <span>Se abonará a tu cuenta:</span>
-                        <span className="font-bold font-mono">
-                          {formatCurrency(convertedVal, targetCurr)}
-                        </span>
+                      <div className="space-y-2 pt-1">
+                        {isCross && (
+                          <CustomExchangeRateInput
+                            sourceCurrency={invCurr}
+                            targetCurrency={targetCurr}
+                            sourceAmount={invVal}
+                            accentColor="emerald"
+                            onRateChange={(rate, computed) => {
+                              setLiquidationAppliedRate(rate);
+                              setLiquidationCustomComputed(computed);
+                            }}
+                          />
+                        )}
+
+                        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-300">
+                          <span>Se abonará a tu cuenta:</span>
+                          <span className="font-bold font-mono">
+                            {formatCurrency(convertedVal, targetCurr)}
+                          </span>
+                        </div>
                       </div>
                     );
                   })()}
@@ -493,6 +633,11 @@ export default function InvestmentsPage() {
               )}
             </div>
 
+            {deleteError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 text-left">
+                {deleteError}
+              </div>
+            )}
 
             <div className="flex gap-3 pt-2">
               <button
