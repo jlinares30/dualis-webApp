@@ -28,6 +28,8 @@ import { useCreateTransaction } from '@/features/transactions';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
+import { useGuestGate } from '@/hooks';
+import { AuthModal } from '@/features/auth';
 
 export default function AccountsPage({ workspace = 'personal' }: { workspace?: WorkspaceType }) {
   const { data: apiAccounts, isLoading } = useAccounts();
@@ -45,6 +47,7 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
   const { activeWorkspaceId, activeWorkspaceType, workspaces } = useWorkspaceStore();
   const { user } = useAuthStore();
   const convert = useExchangeRateStore((s) => s.convert);
+  const { isGuest, isAuthModalOpen, requireAuth, closeAuthModal, gateConfig } = useGuestGate();
 
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
   const baseCurrency = (activeWs?.currency || user?.preferredCurrency || 'PEN').toUpperCase();
@@ -187,7 +190,15 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
         </div>
 
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            requireAuth(
+              () => setIsModalOpen(true),
+              {
+                title: 'Administra tus Cuentas Bancarias',
+                subtitle: 'Crea tu cuenta gratis para conectar tus bancos, tarjetas y billeteras digitales.',
+              }
+            );
+          }}
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Nueva Cuenta
@@ -401,7 +412,13 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenMenuId(null);
-                                setEditingAccount(acc);
+                                requireAuth(
+                                  () => setEditingAccount(acc),
+                                  {
+                                    title: 'Editar Cuenta Bancaria',
+                                    subtitle: 'Crea tu cuenta gratis para gestionar y personalizar tus cuentas bancarias.',
+                                  }
+                                );
                               }}
                               className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-200 hover:text-white hover:bg-indigo-600/20 transition-colors text-left cursor-pointer"
                             >
@@ -413,7 +430,13 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setOpenMenuId(null);
-                                setAccountToDelete(acc);
+                                requireAuth(
+                                  () => setAccountToDelete(acc),
+                                  {
+                                    title: 'Archivar Cuenta Bancaria',
+                                    subtitle: 'Crea tu cuenta gratis para archivar o eliminar cuentas.',
+                                  }
+                                );
                               }}
                               className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 transition-colors text-left cursor-pointer"
                             >
@@ -672,6 +695,14 @@ export default function AccountsPage({ workspace = 'personal' }: { workspace?: W
           </div>
         </div>
       )}
+
+      {/* Guest Auth Gate Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        title={gateConfig.title}
+        subtitle={gateConfig.subtitle}
+      />
     </div>
   );
 }

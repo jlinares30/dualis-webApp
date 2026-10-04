@@ -3,6 +3,8 @@ import { getBudgets, createBudget, updateBudget, deleteBudget, CreateBudgetReque
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
+import { DEMO_BUDGETS } from '@/lib/mock-demo-data';
+
 export function useBudgets(month?: number, year?: number) {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -10,11 +12,15 @@ export function useBudgets(month?: number, year?: number) {
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
 
   return useQuery({
-    queryKey: ['budgets', activeWorkspaceId, month, year],
-    queryFn: () => getBudgets(activeWorkspaceId!, month, year),
-    enabled: isAuthenticated && Boolean(isValidUuid),
+    queryKey: ['budgets', activeWorkspaceId, month, year, isAuthenticated],
+    queryFn: () => {
+      if (!isAuthenticated) {
+        return DEMO_BUDGETS;
+      }
+      return getBudgets(activeWorkspaceId!, month, year);
+    },
+    enabled: (!isAuthenticated) || Boolean(isValidUuid),
   });
-
 }
 
 export function useCreateBudget() {

@@ -3,6 +3,8 @@ import { getAccounts, createAccount, updateAccount, deleteAccount, CreateAccount
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
+import { DEMO_ACCOUNTS } from '@/lib/mock-demo-data';
+
 export function useAccounts(customWorkspaceId?: string) {
   const storeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const activeWorkspaceId = customWorkspaceId || storeWorkspaceId;
@@ -12,10 +14,15 @@ export function useAccounts(customWorkspaceId?: string) {
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
 
   return useQuery({
-    queryKey: ['accounts', activeWorkspaceId],
-    queryFn: () => getAccounts(activeWorkspaceId!),
-    enabled: isAuthenticated && Boolean(isValidUuid),
-    refetchInterval: hasPartner ? 5000 : false,
+    queryKey: ['accounts', activeWorkspaceId, isAuthenticated],
+    queryFn: () => {
+      if (!isAuthenticated) {
+        return DEMO_ACCOUNTS;
+      }
+      return getAccounts(activeWorkspaceId!);
+    },
+    enabled: (!isAuthenticated) || Boolean(isValidUuid),
+    refetchInterval: isAuthenticated && hasPartner ? 5000 : false,
     refetchIntervalInBackground: false,
   });
 }

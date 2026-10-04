@@ -17,11 +17,16 @@ export function useSplitRules() {
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
 
   return useQuery({
-    queryKey: ['splitRules', activeWorkspaceId],
-    queryFn: () => getSplitRulesByWorkspace(activeWorkspaceId!),
-    enabled: isAuthenticated && Boolean(isValidUuid),
+    queryKey: ['splitRules', activeWorkspaceId, isAuthenticated],
+    queryFn: () => {
+      if (!isAuthenticated) {
+        return [];
+      }
+      return getSplitRulesByWorkspace(activeWorkspaceId!);
+    },
+    enabled: (!isAuthenticated) || Boolean(isValidUuid),
     // Near Real-Time: sondea cambios en segundo plano cada 4s si es workspace de pareja
-    refetchInterval: hasPartner ? 4000 : false,
+    refetchInterval: isAuthenticated && hasPartner ? 4000 : false,
     refetchIntervalInBackground: false, // Pausa si la pestaña no está activa para ahorrar recursos
   });
 }

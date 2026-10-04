@@ -2,21 +2,33 @@
 
 import React, { useState } from 'react';
 import { loginUser, registerUser } from '@/lib/auth';
-import { Sparkles, Lock, Mail, User, ShieldCheck, AlertCircle, ArrowRight } from 'lucide-react';
+import { useAuthStore } from '@/lib/stores/useAuthStore';
+import { Sparkles, Lock, Mail, User, ShieldCheck, AlertCircle, ArrowRight, X } from 'lucide-react';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess?: () => void;
+  title?: string;
+  subtitle?: string;
+  defaultIsRegister?: boolean;
 }
 
-export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
-  const [isRegister, setIsRegister] = useState(false);
+export function AuthModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  title,
+  subtitle,
+  defaultIsRegister = true,
+}: AuthModalProps) {
+  const [isRegister, setIsRegister] = useState(defaultIsRegister);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const setAuth = useAuthStore((s) => s.setAuth);
 
   if (!isOpen) return null;
 
@@ -26,21 +38,32 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
     setLoading(true);
 
     try {
+      let res;
       if (isRegister) {
-        await registerUser({
+        res = await registerUser({
           email,
           password,
           fullName,
           baseCurrency: 'PEN',
         });
-
       } else {
-        await loginUser({
+        res = await loginUser({
           email,
           password,
         });
       }
-      onSuccess();
+
+      if (res && res.token) {
+        setAuth(res.token, {
+          id: res.id || 'user-id',
+          email: res.email || email,
+          fullName: res.name || fullName || email.split('@')[0],
+          preferredCurrency: 'PEN',
+          onboardingCompleted: res.onboardingCompleted ?? true,
+        });
+      }
+
+      if (onSuccess) onSuccess();
       onClose();
     } catch (err: any) {
       setError(err.message || 'Error al autenticar. Por favor verifica tus datos.');
@@ -50,8 +73,17 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in duration-200">
       <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-[#0f172a] border border-gray-800 shadow-2xl p-6 sm:p-8">
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800/80 transition-colors cursor-pointer z-10"
+          aria-label="Cerrar modal"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
         {/* Glow Effect */}
         <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
@@ -59,14 +91,16 @@ export function AuthModal({ isOpen, onClose, onSuccess }: AuthModalProps) {
         {/* Header */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 mb-3 shadow-inner">
-            <ShieldCheck className="w-6 h-6" />
+            <Sparkles className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-extrabold text-white tracking-tight">
-            {isRegister ? 'Crear Cuenta en Dualis' : 'Iniciar Sesión'}
+            {title ? title : isRegister ? 'Crear Cuenta en Dualis' : 'Iniciar Sesión'}
           </h2>
-          <p className="text-xs text-gray-400 mt-1">
-            {isRegister
-              ? 'Conéctate a tu servidor Spring Boot para sincronizar tus finanzas.'
+          <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">
+            {subtitle
+              ? subtitle
+              : isRegister
+              ? 'Regístrate en 30 segundos para sincronizar tus finanzas y compartir con tu pareja.'
               : 'Ingresa a tu cuenta para acceder a tu panel financiero.'}
           </p>
         </div>

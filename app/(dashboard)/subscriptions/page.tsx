@@ -20,6 +20,8 @@ import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 import { useQueryClient } from '@tanstack/react-query';
+import { useGuestGate } from '@/hooks';
+import { AuthModal } from '@/features/auth';
 
 export default function SubscriptionsPage() {
   const queryClient = useQueryClient();
@@ -55,6 +57,7 @@ export default function SubscriptionsPage() {
   const [dueDay, setDueDay] = useState('5');
   const [category, setCategory] = useState<'HOUSING' | 'UTILITIES' | 'SUBSCRIPTION' | 'HEALTH' | 'EDUCATION' | 'OTHER'>('SUBSCRIPTION');
   const [isVariableAmount, setIsVariableAmount] = useState(false);
+  const { isGuest, isAuthModalOpen, requireAuth, closeAuthModal, gateConfig } = useGuestGate();
 
   // Estados de filtrado y búsqueda de suscripciones
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'OVERDUE' | 'PAID'>('ALL');
@@ -471,13 +474,14 @@ export default function SubscriptionsPage() {
 
   const handleSaveIncomes = async (e: React.FormEvent) => {
     e.preventDefault();
-    const myInc = parseFloat(myIncomeInput) || 0;
-    const partnerInc = parseFloat(partnerIncomeInput) || 0;
-    setMonthlyIncomes(myInc, partnerInc);
-    setIsSavingIncome(true);
+    requireAuth(async () => {
+      const myInc = parseFloat(myIncomeInput) || 0;
+      const partnerInc = parseFloat(partnerIncomeInput) || 0;
+      setMonthlyIncomes(myInc, partnerInc);
+      setIsSavingIncome(true);
 
-    if (activeWorkspaceId) {
-      try {
+      if (activeWorkspaceId) {
+        try {
         // Asignar correctamente A y B según quién está guardando
         const partnerAIncome = isOwner ? myInc : partnerInc;
         const partnerBIncome = isOwner ? partnerInc : myInc;
@@ -540,6 +544,10 @@ export default function SubscriptionsPage() {
 
     setIncomeSaved(true);
     setTimeout(() => setIncomeSaved(false), 2500);
+    }, {
+      title: 'Configurar Sueldos Fijos',
+      subtitle: 'Crea tu cuenta gratis para calcular la equidad y proporción de gastos automáticamente.',
+    });
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -666,7 +674,15 @@ export default function SubscriptionsPage() {
         </div>
 
         <button
-          onClick={() => setModalOpen(true)}
+          onClick={() => {
+            requireAuth(
+              () => setModalOpen(true),
+              {
+                title: 'Organiza tus Gastos Fijos',
+                subtitle: 'Crea tu cuenta gratis para registrar recibos, suscripciones y controlar fechas de corte.',
+              }
+            );
+          }}
           className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer self-start md:self-auto"
         >
           <Plus className="w-4 h-4" /> Agregar Pago Fijo
@@ -1283,7 +1299,15 @@ export default function SubscriptionsPage() {
                     </div>
 
                     <button
-                      onClick={() => deleteSubMut(sub.id)}
+                      onClick={() => {
+                        requireAuth(
+                          () => deleteSubMut(sub.id),
+                          {
+                            title: 'Eliminar Suscripción',
+                            subtitle: 'Crea tu cuenta gratis para gestionar o eliminar tus gastos fijos recurrentes.',
+                          }
+                        );
+                      }}
                       className="p-1.5 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                       title="Eliminar pago fijo"
                     >
@@ -1310,21 +1334,29 @@ export default function SubscriptionsPage() {
                   {/* Botón principal de pago */}
                   <button
                     onClick={() => {
-                      if (sub.isPaidThisMonth) {
-                        togglePaidMut(sub.id);
-                      } else if (isVariable) {
-                        setPayingSub({
-                          id: sub.id,
-                          name: sub.name,
-                          amount: sub.amount,
-                          isVariable: true,
-                          currency: sub.currency || currency,
-                        });
-                        setActualPaidAmount(String(sub.amount));
-                        setPayingAccountId(accountsData[0]?.id || coupleAccountsData[0]?.id || '');
-                      } else {
-                        togglePaidMut(sub.id);
-                      }
+                      requireAuth(
+                        () => {
+                          if (sub.isPaidThisMonth) {
+                            togglePaidMut(sub.id);
+                          } else if (isVariable) {
+                            setPayingSub({
+                              id: sub.id,
+                              name: sub.name,
+                              amount: sub.amount,
+                              isVariable: true,
+                              currency: sub.currency || currency,
+                            });
+                            setActualPaidAmount(String(sub.amount));
+                            setPayingAccountId(accountsData[0]?.id || coupleAccountsData[0]?.id || '');
+                          } else {
+                            togglePaidMut(sub.id);
+                          }
+                        },
+                        {
+                          title: 'Registrar Pago de Servicio',
+                          subtitle: 'Crea tu cuenta gratis para marcar pagos y vincularlos a tus cuentas bancarias.',
+                        }
+                      );
                     }}
                     className={`flex-1 py-2 px-3 rounded-xl border font-bold text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm ${
                       sub.isPaidThisMonth
@@ -1353,15 +1385,23 @@ export default function SubscriptionsPage() {
                     <button
                       type="button"
                       onClick={() => {
-                        setPayingSub({
-                          id: sub.id,
-                          name: sub.name,
-                          amount: sub.amount,
-                          isVariable: isVariable,
-                          currency: sub.currency || currency,
-                        });
-                        setActualPaidAmount(String(sub.amount));
-                        setPayingAccountId(accountsData[0]?.id || coupleAccountsData[0]?.id || '');
+                        requireAuth(
+                          () => {
+                            setPayingSub({
+                              id: sub.id,
+                              name: sub.name,
+                              amount: sub.amount,
+                              isVariable: isVariable,
+                              currency: sub.currency || currency,
+                            });
+                            setActualPaidAmount(String(sub.amount));
+                            setPayingAccountId(accountsData[0]?.id || coupleAccountsData[0]?.id || '');
+                          },
+                          {
+                            title: 'Pagar con Recibo Real',
+                            subtitle: 'Crea tu cuenta gratis para conciliar pagos exactos con tus cuentas.',
+                          }
+                        );
                       }}
                       className="p-2 rounded-xl border border-gray-800 bg-gray-900/80 hover:bg-gray-800 text-gray-400 hover:text-amber-400 transition-colors cursor-pointer"
                       title="Pagar ingresando monto exacto de recibo y debitar de cuenta"
@@ -1602,6 +1642,14 @@ export default function SubscriptionsPage() {
           </div>
         </div>
       )}
+
+      {/* Guest Auth Gate Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        title={gateConfig.title}
+        subtitle={gateConfig.subtitle}
+      />
     </div>
   );
 }

@@ -9,6 +9,8 @@ import { CreateSettlementPayload } from '@/types';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
+import { DEMO_SETTLEMENT_SUMMARY } from '@/lib/mock-demo-data';
+
 export function useDebtBalanceSummary(customWorkspaceId?: string) {
   const storeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const workspaces = useWorkspaceStore((state) => state.workspaces);
@@ -23,11 +25,16 @@ export function useDebtBalanceSummary(customWorkspaceId?: string) {
   const isCoupleWorkspace = targetWs?.type === 'COUPLE';
 
   return useQuery({
-    queryKey: ['debtBalanceSummary', targetWorkspaceId],
-    queryFn: () => getDebtBalanceSummary(targetWorkspaceId!),
-    enabled: isAuthenticated && Boolean(isValidUuid) && Boolean(isCoupleWorkspace),
+    queryKey: ['debtBalanceSummary', targetWorkspaceId, isAuthenticated],
+    queryFn: () => {
+      if (!isAuthenticated) {
+        return DEMO_SETTLEMENT_SUMMARY;
+      }
+      return getDebtBalanceSummary(targetWorkspaceId!);
+    },
+    enabled: (!isAuthenticated) || (Boolean(isValidUuid) && Boolean(isCoupleWorkspace)),
     retry: false,
-    refetchInterval: 5000,
+    refetchInterval: isAuthenticated ? 5000 : false,
     refetchIntervalInBackground: false,
   });
 }

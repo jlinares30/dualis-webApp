@@ -71,24 +71,24 @@ export default function DashboardLayout({
     }
   }, [hasPartner, workspaces, activeWorkspaceId, switchWorkspaceType]);
 
+  // Si no está autenticado, inicializar el workspace demo si no hay ninguno activo
   useEffect(() => {
-    if (isMounted) {
-      const storedToken = localStorage.getItem('dualis_auth_token');
-      if (!isAuthenticated && !token && !storedToken) {
-        router.replace('/login');
+    if (isMounted && !isAuthenticated && !token) {
+      if (!activeWorkspaceId) {
+        useWorkspaceStore.getState().setActiveWorkspace('demo-workspace-0000-0000-0000-000000000001', 'personal');
       }
     }
-  }, [isMounted, isAuthenticated, token, router]);
+  }, [isMounted, isAuthenticated, token, activeWorkspaceId]);
 
   const currentWorkspace: WorkspaceType = activeWorkspaceType === 'COUPLE' || activeWorkspaceType === 'couple' ? 'couple' : 'personal';
 
-  // Mostrar un loader mientras se verifica el estado de sesión
-  if (!isMounted || (!isAuthenticated && !token && (typeof window !== 'undefined' && !localStorage.getItem('dualis_auth_token')))) {
+  // Mostrar un loader inicial solo mientras se monta en el cliente
+  if (!isMounted) {
     return (
       <div className="min-h-screen bg-[#090d16] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-gray-400 font-medium">Verificando sesión...</p>
+          <p className="text-xs text-gray-400 font-medium">Iniciando Dualis...</p>
         </div>
       </div>
     );

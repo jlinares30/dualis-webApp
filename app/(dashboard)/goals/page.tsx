@@ -8,6 +8,8 @@ import { useAccounts } from '@/features/accounts';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 import { CustomExchangeRateInput } from '@/components/ui/custom-exchange-rate-input';
+import { useGuestGate } from '@/hooks';
+import { AuthModal } from '@/features/auth';
 
 const COMMON_CURRENCIES = ['PEN', 'USD', 'EUR', 'COP', 'MXN', 'CLP', 'ARS', 'BRL'];
 
@@ -132,16 +134,26 @@ export default function GoalsPage() {
     }
   };
 
+  const { isGuest, isAuthModalOpen, requireAuth, closeAuthModal, gateConfig } = useGuestGate();
+
   const handleOpenCreate = () => {
-    setCreateCurrency(workspaceCurrency);
-    setName('');
-    setTargetAmount('');
-    setCurrentAmount('');
-    setDeadlineDate('');
-    setCategory('EMERGENCY');
-    setSelectedAccountId('');
-    setFormError(null);
-    setModalOpen(true);
+    requireAuth(
+      () => {
+        setCreateCurrency(workspaceCurrency);
+        setName('');
+        setTargetAmount('');
+        setCurrentAmount('');
+        setDeadlineDate('');
+        setCategory('EMERGENCY');
+        setSelectedAccountId('');
+        setFormError(null);
+        setModalOpen(true);
+      },
+      {
+        title: 'Crea tus Metas de Ahorro',
+        subtitle: 'Regístrate gratis para fijar objetivos, calcular cuotas mensuales y apartar fondos.',
+      }
+    );
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -423,14 +435,30 @@ export default function GoalsPage() {
 
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => handleOpenEdit(goal)}
+                        onClick={() => {
+                          requireAuth(
+                            () => handleOpenEdit(goal),
+                            {
+                              title: 'Editar Meta de Ahorro',
+                              subtitle: 'Crea tu cuenta gratis para personalizar tus objetivos de ahorro.',
+                            }
+                          );
+                        }}
                         className="p-1.5 rounded-xl text-gray-500 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
                         title="Editar meta"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setDeletingGoal(goal)}
+                        onClick={() => {
+                          requireAuth(
+                            () => setDeletingGoal(goal),
+                            {
+                              title: 'Eliminar Meta de Ahorro',
+                              subtitle: 'Crea tu cuenta gratis para gestionar o eliminar tus metas de ahorro.',
+                            }
+                          );
+                        }}
                         className="p-1.5 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                         title="Eliminar meta"
                       >
@@ -535,7 +563,15 @@ export default function GoalsPage() {
                         <CheckCircle className="w-4 h-4" /> ¡Meta Alcanzada!
                       </span>
                       <button
-                        onClick={() => handleOpenDeposit(goal)}
+                        onClick={() => {
+                          requireAuth(
+                            () => handleOpenDeposit(goal),
+                            {
+                              title: 'Abonar a Meta',
+                              subtitle: 'Crea tu cuenta gratis para apartar capital y cumplir tus metas.',
+                            }
+                          );
+                        }}
                         className="py-1.5 px-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium text-xs transition-all flex items-center gap-1 cursor-pointer"
                         title="Seguir acumulando"
                       >
@@ -544,7 +580,15 @@ export default function GoalsPage() {
                     </div>
                   ) : (
                     <button
-                      onClick={() => handleOpenDeposit(goal)}
+                      onClick={() => {
+                        requireAuth(
+                          () => handleOpenDeposit(goal),
+                          {
+                            title: 'Abonar a Meta',
+                            subtitle: 'Crea tu cuenta gratis para apartar capital y cumplir tus metas.',
+                          }
+                        );
+                      }}
                       className="w-full py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 font-bold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
                     >
                       <ArrowUpRight className="w-3.5 h-3.5" /> Abonar Dinero
@@ -1130,6 +1174,14 @@ export default function GoalsPage() {
           </div>
         </div>
       )}
+
+      {/* Guest Auth Gate Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        title={gateConfig.title}
+        subtitle={gateConfig.subtitle}
+      />
     </div>
   );
 }

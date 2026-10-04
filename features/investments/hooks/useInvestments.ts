@@ -11,6 +11,8 @@ import {
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
+import { DEMO_INVESTMENTS } from '@/lib/mock-demo-data';
+
 export function useInvestments(customWorkspaceId?: string) {
   const storeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const activeWorkspaceId = customWorkspaceId || storeWorkspaceId;
@@ -19,9 +21,14 @@ export function useInvestments(customWorkspaceId?: string) {
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
 
   return useQuery<InvestmentDTO[]>({
-    queryKey: ['investments', activeWorkspaceId],
-    queryFn: () => getInvestments(activeWorkspaceId!),
-    enabled: isAuthenticated && Boolean(isValidUuid),
+    queryKey: ['investments', activeWorkspaceId, isAuthenticated],
+    queryFn: () => {
+      if (!isAuthenticated) {
+        return DEMO_INVESTMENTS;
+      }
+      return getInvestments(activeWorkspaceId!);
+    },
+    enabled: (!isAuthenticated) || Boolean(isValidUuid),
   });
 }
 

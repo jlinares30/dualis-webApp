@@ -29,11 +29,14 @@ import {
   BudgetDTO 
 } from '@/features/budgets';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
+import { useGuestGate } from '@/hooks';
+import { AuthModal } from '@/features/auth';
 
 export default function BudgetsPage() {
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const { isGuest, isAuthModalOpen, requireAuth, closeAuthModal, gateConfig } = useGuestGate();
 
   const { data: apiBudgets, isLoading } = useBudgets(selectedMonth, selectedYear);
   const { mutateAsync: deleteBudgetMut, isPending: isDeleting } = useDeleteBudget();
@@ -160,7 +163,15 @@ export default function BudgetsPage() {
           </div>
 
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              requireAuth(
+                () => setIsModalOpen(true),
+                {
+                  title: 'Controla tus Gastos con Presupuestos',
+                  subtitle: 'Crea tu cuenta gratis para fijar límites mensuales por categoría y recibir alertas.',
+                }
+              );
+            }}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" /> Crear Presupuesto
@@ -320,7 +331,15 @@ export default function BudgetsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setEditingBudget(b)}
+                        onClick={() => {
+                          requireAuth(
+                            () => setEditingBudget(b),
+                            {
+                              title: 'Editar Presupuesto',
+                              subtitle: 'Crea tu cuenta gratis para personalizar tus límites y presupuestos.',
+                            }
+                          );
+                        }}
                         className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
                         title="Editar presupuesto"
                       >
@@ -328,7 +347,15 @@ export default function BudgetsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setDeletingBudgetId(b.id)}
+                        onClick={() => {
+                          requireAuth(
+                            () => setDeletingBudgetId(b.id),
+                            {
+                              title: 'Eliminar Presupuesto',
+                              subtitle: 'Crea tu cuenta gratis para gestionar y eliminar tus presupuestos.',
+                            }
+                          );
+                        }}
                         className="p-1.5 rounded-lg text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                         title="Eliminar presupuesto"
                       >
@@ -449,6 +476,14 @@ export default function BudgetsPage() {
           </div>
         </div>
       )}
+
+      {/* Guest Auth Gate Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        title={gateConfig.title}
+        subtitle={gateConfig.subtitle}
+      />
     </div>
   );
 }

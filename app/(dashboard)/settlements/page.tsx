@@ -24,6 +24,8 @@ import { useDebtBalanceSummary, useSettlementsHistory, useCreateSettlement, comp
 import { useAccounts } from '@/features/accounts';
 import { useCreateTransaction } from '@/features/transactions';
 import { useQueryClient } from '@tanstack/react-query';
+import { useGuestGate } from '@/hooks';
+import { AuthModal } from '@/features/auth';
 import Link from 'next/link';
 
 export default function SettlementPage() {
@@ -100,16 +102,26 @@ export default function SettlementPage() {
     }
   }, [availableAccounts, defaultSettlementAccountId, selectedAccountId]);
 
+  const { isGuest, isAuthModalOpen, requireAuth, closeAuthModal, gateConfig } = useGuestGate();
+
   const openSettleModal = () => {
-    setCustomAmount(netBalance > 0 ? netBalance.toString() : '0');
-    if (defaultSettlementAccountId && availableAccounts.some((a) => a.id === defaultSettlementAccountId)) {
-      setSelectedAccountId(defaultSettlementAccountId);
-    } else if (availableAccounts.length > 0 && !selectedAccountId) {
-      setSelectedAccountId(availableAccounts[0].id);
-    }
-    setErrorMsg(null);
-    setSuccessMsg(null);
-    setModalOpen(true);
+    requireAuth(
+      () => {
+        setCustomAmount(netBalance > 0 ? netBalance.toString() : '0');
+        if (defaultSettlementAccountId && availableAccounts.some((a) => a.id === defaultSettlementAccountId)) {
+          setSelectedAccountId(defaultSettlementAccountId);
+        } else if (availableAccounts.length > 0 && !selectedAccountId) {
+          setSelectedAccountId(availableAccounts[0].id);
+        }
+        setErrorMsg(null);
+        setSuccessMsg(null);
+        setModalOpen(true);
+      },
+      {
+        title: 'Saldar Gastos Compartidos',
+        subtitle: 'Crea tu cuenta gratis para registrar pagos de liquidación y sincronizar cuentas.',
+      }
+    );
   };
 
   const handleSettleSubmit = async (e: React.FormEvent) => {
@@ -613,6 +625,14 @@ export default function SettlementPage() {
           </div>
         </div>
       )}
+
+      {/* Guest Auth Gate Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        title={gateConfig.title}
+        subtitle={gateConfig.subtitle}
+      />
     </div>
   );
 }

@@ -4,16 +4,23 @@ import { CreateSubscriptionRequest } from '@/types';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
+import { DEMO_SUBSCRIPTIONS, DEMO_SALARY_CONFIG } from '@/lib/mock-demo-data';
+
 export function useSubscriptions() {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const hasPartner = useWorkspaceStore((state) => state.hasPartner);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: ['subscriptions', activeWorkspaceId],
-    queryFn: () => getSubscriptions(activeWorkspaceId!),
-    enabled: isAuthenticated && Boolean(activeWorkspaceId),
-    refetchInterval: hasPartner ? 5000 : false,
+    queryKey: ['subscriptions', activeWorkspaceId, isAuthenticated],
+    queryFn: () => {
+      if (!isAuthenticated) {
+        return DEMO_SUBSCRIPTIONS;
+      }
+      return getSubscriptions(activeWorkspaceId!);
+    },
+    enabled: (!isAuthenticated) || Boolean(activeWorkspaceId),
+    refetchInterval: isAuthenticated && hasPartner ? 5000 : false,
     refetchIntervalInBackground: false,
   });
 }
@@ -54,12 +61,15 @@ export function useSalaryDistributionConfig() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: ['salaryDistributionConfig', activeWorkspaceId, user?.email],
+    queryKey: ['salaryDistributionConfig', activeWorkspaceId, user?.email, isAuthenticated],
     queryFn: async () => {
+      if (!isAuthenticated) {
+        return DEMO_SALARY_CONFIG;
+      }
       const { getSalaryDistributionConfig } = await import('../services/subscriptions-service');
       return getSalaryDistributionConfig(activeWorkspaceId!, user?.email);
     },
-    enabled: isAuthenticated && Boolean(activeWorkspaceId),
+    enabled: (!isAuthenticated) || Boolean(activeWorkspaceId),
     staleTime: 1000 * 60 * 5,
   });
 }
