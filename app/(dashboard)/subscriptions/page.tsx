@@ -71,9 +71,12 @@ export default function SubscriptionsPage() {
   const personalWs = workspaces.find((w) => w.type === 'INDIVIDUAL');
   const coupleWs = workspaces.find((w) => w.type === 'COUPLE');
   const { data: accountsData = [] } = useAccounts(personalWs?.id || activeWorkspaceId || undefined);
-  const { data: coupleAccountsData = [] } = useAccounts(coupleWs?.id || undefined);
+  const { data: rawCoupleAccounts = [] } = useAccounts(coupleWs?.id || undefined);
+  const coupleAccountsData = useMemo(() => (coupleWs ? rawCoupleAccounts : []), [coupleWs, rawCoupleAccounts]);
+
   const { data: investmentsData = [] } = useInvestments(personalWs?.id || activeWorkspaceId || undefined);
-  const { data: coupleInvestmentsData = [] } = useInvestments(coupleWs?.id || undefined);
+  const { data: rawCoupleInvestments = [] } = useInvestments(coupleWs?.id || undefined);
+  const coupleInvestmentsData = useMemo(() => (coupleWs ? rawCoupleInvestments : []), [coupleWs, rawCoupleInvestments]);
   const { mutateAsync: createTxMut } = useCreateTransaction();
 
   // Función para confirmar el pago (con monto real si fue editado)
@@ -1444,15 +1447,17 @@ export default function SubscriptionsPage() {
                   >
                     <option value="">No registrar gasto en cuenta bancaria</option>
                     {accountsData.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
+                      <option key={`bill-personal-${acc.id}`} value={acc.id}>
                         💳 {acc.name} ({acc.currency} {acc.balance.toFixed(2)}) - Personal
                       </option>
                     ))}
-                    {coupleAccountsData.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        👥 {acc.name} ({acc.currency} {acc.balance.toFixed(2)}) - Compartida
-                      </option>
-                    ))}
+                    {coupleAccountsData
+                      .filter((acc) => !accountsData.some((pAcc) => pAcc.id === acc.id))
+                      .map((acc) => (
+                        <option key={`bill-couple-${acc.id}`} value={acc.id}>
+                          👥 {acc.name} ({acc.currency} {acc.balance.toFixed(2)}) - Compartida
+                        </option>
+                      ))}
                   </select>
                   <span className="text-[10px] text-gray-500 mt-0.5 block">
                     Si seleccionas una cuenta, se creará automáticamente la transacción de egreso con el monto exacto.

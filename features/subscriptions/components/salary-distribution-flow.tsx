@@ -157,17 +157,33 @@ export const SalaryDistributionFlow: React.FC<SalaryDistributionFlowProps> = ({
     }
   }, [config, accounts]);
 
-  // Unir todas las cuentas disponibles indicando de qué workspace son
-  const allAvailableAccounts = [
-    ...accounts.map((a) => ({ ...a, workspaceType: 'PERSONAL' as const, groupLabel: '👤 Mis Cuentas Personales' })),
-    ...coupleAccounts.map((a) => ({ ...a, workspaceType: 'COUPLE' as const, groupLabel: '👥 Cuentas Compartidas de Pareja' })),
-  ];
+  // Unir y desduplicar todas las cuentas disponibles indicando de qué workspace son
+  const allAvailableAccounts = React.useMemo(() => {
+    const list = [
+      ...accounts.map((a) => ({ ...a, workspaceType: 'PERSONAL' as const, groupLabel: '👤 Mis Cuentas Personales' })),
+      ...coupleAccounts.map((a) => ({ ...a, workspaceType: 'COUPLE' as const, groupLabel: '👥 Cuentas Compartidas de Pareja' })),
+    ];
+    const seen = new Set<string>();
+    return list.filter((a) => {
+      if (seen.has(a.id)) return false;
+      seen.add(a.id);
+      return true;
+    });
+  }, [accounts, coupleAccounts]);
 
-  // Unir todas las inversiones disponibles
-  const allAvailableInvestments = [
-    ...investments.map((inv) => ({ ...inv, workspaceType: 'PERSONAL' as const, groupLabel: '📈 Mis Inversiones Personales' })),
-    ...coupleInvestments.map((inv) => ({ ...inv, workspaceType: 'COUPLE' as const, groupLabel: '👥 Inversiones de Pareja' })),
-  ];
+  // Unir y desduplicar todas las inversiones disponibles
+  const allAvailableInvestments = React.useMemo(() => {
+    const list = [
+      ...investments.map((inv) => ({ ...inv, workspaceType: 'PERSONAL' as const, groupLabel: '📈 Mis Inversiones Personales' })),
+      ...coupleInvestments.map((inv) => ({ ...inv, workspaceType: 'COUPLE' as const, groupLabel: '👥 Inversiones de Pareja' })),
+    ];
+    const seen = new Set<string>();
+    return list.filter((inv) => {
+      if (seen.has(inv.id)) return false;
+      seen.add(inv.id);
+      return true;
+    });
+  }, [investments, coupleInvestments]);
 
   const convert = useExchangeRateStore((s) => s.convert);
 
