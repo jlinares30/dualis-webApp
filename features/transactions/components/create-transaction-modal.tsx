@@ -46,6 +46,11 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
   const [fixedPartnerAmount, setFixedPartnerAmount] = useState('');
   const [allowNegativeBalance, setAllowNegativeBalance] = useState(false);
 
+  // Estados para creación rápida de categoría personalizada
+  const [isCreatingCustomCategory, setIsCreatingCustomCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+
   // Sincronizar al abrir el modal o si se pasa una transacción para editar
   useEffect(() => {
     if (isOpen) {
@@ -665,22 +670,77 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1">Categoría</label>
-                <select
-                  value={selectedCategoryId}
-                  onChange={(e) => setSelectedCategoryId(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500"
-                >
-                  {categoriesData && categoriesData.length > 0 ? (
-                    categoriesData.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">Categoría General (Autocrear)</option>
-                  )}
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-gray-300">Categoría</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingCustomCategory(!isCreatingCustomCategory);
+                      setNewCategoryName('');
+                    }}
+                    className="text-[11px] text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer"
+                  >
+                    {isCreatingCustomCategory ? 'Seleccionar existente' : '+ Nueva categoría'}
+                  </button>
+                </div>
+
+                {isCreatingCustomCategory ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder={type === 'income' ? 'Ej. Trabajo Extra, Bono especial...' : 'Ej. Mascotas, Gimnasio...'}
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      className="flex-1 px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500"
+                    />
+                    <button
+                      type="button"
+                      disabled={!newCategoryName.trim() || isSavingCategory}
+                      onClick={async () => {
+                        if (!newCategoryName.trim()) return;
+                        setIsSavingCategory(true);
+                        try {
+                          const created = await createCategory({
+                            workspaceId: activeWorkspaceId || '',
+                            name: newCategoryName.trim(),
+                            type: type === 'income' ? 'INCOME' : 'EXPENSE',
+                            categoryNature: 'ESSENTIAL',
+                            icon: type === 'income' ? 'wallet' : 'shopping-bag',
+                            color: type === 'income' ? '#10B981' : '#6366F1',
+                          });
+                          if (created?.id) {
+                            setSelectedCategoryId(created.id);
+                          }
+                          setIsCreatingCustomCategory(false);
+                          setNewCategoryName('');
+                        } catch (err) {
+                          console.error('Error al crear categoría personalizada:', err);
+                        } finally {
+                          setIsSavingCategory(false);
+                        }
+                      }}
+                      className="px-3 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSavingCategory ? '...' : 'Crear'}
+                    </button>
+                  </div>
+                ) : (
+                  <select
+                    value={selectedCategoryId}
+                    onChange={(e) => setSelectedCategoryId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    {categoriesData && categoriesData.length > 0 ? (
+                      categoriesData.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">Categoría General (Autocrear)</option>
+                    )}
+                  </select>
+                )}
               </div>
             </>
           )}
