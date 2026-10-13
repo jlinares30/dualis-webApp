@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getGoals, createGoal, updateGoal, depositToGoal, deleteGoal } from '@/lib/services';
+import { getGoals, createGoal, updateGoal, depositToGoal, withdrawFromGoal, deleteGoal } from '@/lib/services';
 import { CreateGoalRequest } from '@/types';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
@@ -40,6 +40,17 @@ export function useDepositGoal() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ goalId, amount }: { goalId: string; amount: number }) => depositToGoal(goalId, amount),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['goals'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    },
+  });
+}
+
+export function useWithdrawGoal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ goalId, amount }: { goalId: string; amount: number }) => withdrawFromGoal(goalId, amount),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });

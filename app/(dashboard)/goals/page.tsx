@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Target, Plus, ShieldCheck, Plane, Home, Car, Laptop, Trash2, ArrowUpRight, CheckCircle, Pencil, X, AlertCircle, Calendar, Wallet, TrendingUp } from 'lucide-react';
+import { Target, Plus, ShieldCheck, Plane, Home, Car, Laptop, Trash2, ArrowUpRight, ArrowDownLeft, CheckCircle, Pencil, X, AlertCircle, Calendar, Wallet, TrendingUp } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { useGoals, useCreateGoal, useUpdateGoal, useDepositGoal, useDeleteGoal, SavingsGoalDTO } from '@/features/goals';
+import { useGoals, useCreateGoal, useUpdateGoal, useDepositGoal, useWithdrawGoal, useDeleteGoal, SavingsGoalDTO } from '@/features/goals';
 import { useAccounts } from '@/features/accounts';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
@@ -43,16 +43,19 @@ export default function GoalsPage() {
   const { mutateAsync: createGoalMut, isPending: isCreating } = useCreateGoal();
   const { mutateAsync: updateGoalMut, isPending: isUpdating } = useUpdateGoal();
   const { mutateAsync: depositGoalMut, isPending: isDepositing } = useDepositGoal();
+  const { mutateAsync: withdrawGoalMut, isPending: isWithdrawing } = useWithdrawGoal();
   const { mutateAsync: deleteGoalMut } = useDeleteGoal();
 
   const [modalOpen, setModalOpen] = useState(false);
   const [depositModalOpen, setDepositModalOpen] = useState(false);
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const [selectedGoal, setSelectedGoal] = useState<SavingsGoalDTO | null>(null);
 
   // Edit Goal State
   const [editingGoal, setEditingGoal] = useState<SavingsGoalDTO | null>(null);
   const [editName, setEditName] = useState('');
   const [editTargetAmount, setEditTargetAmount] = useState('');
+  const [editCurrentAmount, setEditCurrentAmount] = useState('');
   const [editDeadlineDate, setEditDeadlineDate] = useState('');
   const [editCurrency, setEditCurrency] = useState('PEN');
   const [editCategory, setEditCategory] = useState<'EMERGENCY' | 'TRAVEL' | 'HOUSE' | 'CAR' | 'TECH' | 'OTHER'>('EMERGENCY');
@@ -84,8 +87,9 @@ export default function GoalsPage() {
     setLocalAccountOverrides((prev) => ({ ...prev, [goalId]: accId }));
   };
 
-  // Deposit Form State
+  // Deposit & Withdraw Form State
   const [depositAmount, setDepositAmount] = useState('');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
 
   // Errors & Deletion state
   const [formError, setFormError] = useState<string | null>(null);
@@ -99,6 +103,7 @@ export default function GoalsPage() {
     setEditingGoal(goal);
     setEditName(goal.name);
     setEditTargetAmount(goal.targetAmount?.toString() || '');
+    setEditCurrentAmount(goal.currentAmount?.toString() || '0');
     setEditDeadlineDate(goal.deadlineDate ? goal.deadlineDate.slice(0, 10) : '');
     setEditCurrency(goal.currency || workspaceCurrency);
     setEditCategory((goal.category as any) || 'EMERGENCY');
@@ -117,6 +122,7 @@ export default function GoalsPage() {
         request: {
           name: editName,
           targetAmount: parseFloat(editTargetAmount),
+          currentAmount: editCurrentAmount ? parseFloat(editCurrentAmount) : 0,
           deadlineDate: editDeadlineDate ? editDeadlineDate : undefined,
           category: editCategory,
           currency: editCurrency,
@@ -184,6 +190,13 @@ export default function GoalsPage() {
     setDepositModalOpen(true);
   };
 
+  const handleOpenWithdraw = (goal: SavingsGoalDTO) => {
+    setSelectedGoal(goal);
+    setWithdrawAmount('');
+    setFormError(null);
+    setWithdrawModalOpen(true);
+  };
+
   const handleDeleteGoal = async () => {
     if (!deletingGoal) return;
     try {
@@ -216,6 +229,37 @@ export default function GoalsPage() {
     } catch (err: any) {
       console.error('Error al abonar a la meta:', err);
       setFormError(err?.message || 'Error al procesar el abono a la meta.');
+    }
+  };
+
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedGoal || !withdrawAmount) return;
+
+    const parsedWithdraw = parseFloat(withdrawAmount);
+    if (isNaN(parsedWithdraw) || parsedWithdraw <= 0) {
+      setFormError('Por favor ingresa un monto válido mayor a 0');
+      return;
+    }
+
+    if (parsedWithdraw > (selectedGoal.currentAmount || 0)) {
+      setFormError(`No puedes retirar más de lo ahorrado (${formatCurrency(selectedGoal.currentAmount || 0, selectedGoal.currency || workspaceCurrency)})`);
+      return;
+    }
+
+    setFormError(null);
+    try {
+      await withdrawGoalMut({
+        goalId: selectedGoal.id,
+        amount: parsedWithdraw,
+      });
+
+      setWithdrawModalOpen(false);
+      setWithdrawAmount('');
+      setSelectedGoal(null);
+    } catch (err: any) {
+      console.error('Error al retirar dinero de la meta:', err);
+      setFormError(err?.message || 'Error al procesar el retiro de la meta.');
     }
   };
 
@@ -534,21 +578,43 @@ export default function GoalsPage() {
                       <span className="text-xs font-semibold text-emerald-400 inline-flex items-center gap-1">
                         <CheckCircle className="w-4 h-4" /> ¡Meta Alcanzada!
                       </span>
-                      <button
-                        onClick={() => handleOpenDeposit(goal)}
-                        className="py-1.5 px-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium text-xs transition-all flex items-center gap-1 cursor-pointer"
-                        title="Seguir acumulando"
-                      >
-                        <ArrowUpRight className="w-3.5 h-3.5" /> Abonar más
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        {goal.currentAmount > 0 && (
+                          <button
+                            onClick={() => handleOpenWithdraw(goal)}
+                            className="py-1.5 px-2.5 rounded-xl bg-gray-800/80 hover:bg-gray-800 text-rose-300 hover:text-rose-200 border border-rose-500/20 font-medium text-xs transition-all flex items-center gap-1 cursor-pointer"
+                            title="Retirar dinero ahorrado"
+                          >
+                            <ArrowDownLeft className="w-3.5 h-3.5" /> Retirar
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleOpenDeposit(goal)}
+                          className="py-1.5 px-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium text-xs transition-all flex items-center gap-1 cursor-pointer"
+                          title="Seguir acumulando"
+                        >
+                          <ArrowUpRight className="w-3.5 h-3.5" /> Abonar más
+                        </button>
+                      </div>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => handleOpenDeposit(goal)}
-                      className="w-full py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 font-bold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
-                    >
-                      <ArrowUpRight className="w-3.5 h-3.5" /> Abonar Dinero
-                    </button>
+                    <div className="w-full flex items-center gap-2">
+                      {goal.currentAmount > 0 && (
+                        <button
+                          onClick={() => handleOpenWithdraw(goal)}
+                          className="py-2 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 hover:text-rose-200 font-semibold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                          title="Retirar o sacar dinero de esta meta"
+                        >
+                          <ArrowDownLeft className="w-3.5 h-3.5" /> Retirar
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleOpenDeposit(goal)}
+                        className="flex-1 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 font-bold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <ArrowUpRight className="w-3.5 h-3.5" /> Abonar Dinero
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -868,38 +934,52 @@ export default function GoalsPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-300 mb-1">
-                    Fecha Límite
+                    Monto Actual Ahorrado ({getCurrencySymbol(editCurrency)})
                   </label>
-                  <div className="relative flex items-center">
-                    <input
-                      type="date"
-                      id="edit-deadline-input"
-                      value={editDeadlineDate}
-                      onChange={(e) => setEditDeadlineDate(e.target.value)}
-                      className="w-full px-3 py-2 pr-10 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500 cursor-pointer"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const input = document.getElementById('edit-deadline-input') as HTMLInputElement | null;
-                        if (input) {
-                          try {
-                            if (typeof input.showPicker === 'function') {
-                              input.showPicker();
-                            } else {
-                              input.focus();
-                            }
-                          } catch {
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editCurrentAmount}
+                    onChange={(e) => setEditCurrentAmount(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  Fecha Límite
+                </label>
+                <div className="relative flex items-center">
+                  <input
+                    type="date"
+                    id="edit-deadline-input"
+                    value={editDeadlineDate}
+                    onChange={(e) => setEditDeadlineDate(e.target.value)}
+                    className="w-full px-3 py-2 pr-10 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white outline-none focus:border-indigo-500 cursor-pointer"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const input = document.getElementById('edit-deadline-input') as HTMLInputElement | null;
+                      if (input) {
+                        try {
+                          if (typeof input.showPicker === 'function') {
+                            input.showPicker();
+                          } else {
                             input.focus();
                           }
+                        } catch {
+                          input.focus();
                         }
-                      }}
-                      className="absolute right-2.5 p-1 rounded-lg text-indigo-400 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
-                      title="Abrir calendario"
-                    >
-                      <Calendar className="w-4 h-4" />
-                    </button>
-                  </div>
+                      }
+                    }}
+                    className="absolute right-2.5 p-1 rounded-lg text-indigo-400 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
+                    title="Abrir calendario"
+                  >
+                    <Calendar className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
 
@@ -1085,6 +1165,97 @@ export default function GoalsPage() {
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-50"
                 >
                   {isDepositing ? 'Procesando...' : 'Abonar'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Retirar Dinero de Meta */}
+      {withdrawModalOpen && selectedGoal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="w-full max-w-md rounded-3xl bg-[#0f172a] border border-gray-800 p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base text-white">Retirar Dinero de Meta</h3>
+                <p className="text-xs text-gray-400">
+                  {selectedGoal.name} • Ahorrado:{' '}
+                  <span className="font-mono text-emerald-400 font-bold">
+                    {formatCurrency(selectedGoal.currentAmount, selectedGoal.currency || workspaceCurrency)}
+                  </span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setWithdrawModalOpen(false);
+                  setSelectedGoal(null);
+                }}
+                className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">
+                  Monto a Retirar ({getCurrencySymbol(selectedGoal.currency || workspaceCurrency)} {selectedGoal.currency || workspaceCurrency})
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  max={selectedGoal.currentAmount || 0}
+                  required
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  placeholder="Ej. 100.00"
+                  className="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-800 text-xs text-white outline-none focus:border-rose-500"
+                />
+                <div className="flex items-center justify-between mt-1 text-[10px] text-gray-500">
+                  <span>Disponible para retirar:</span>
+                  <button
+                    type="button"
+                    onClick={() => setWithdrawAmount(String(selectedGoal.currentAmount || 0))}
+                    className="text-indigo-400 hover:text-indigo-300 underline font-semibold cursor-pointer"
+                  >
+                    Retirar todo ({formatCurrency(selectedGoal.currentAmount, selectedGoal.currency || workspaceCurrency)})
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-start gap-2">
+                <ShieldCheck className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <span>
+                  El dinero retirado volverá a estar libre y disponible en tus saldos generales sin computarse como ingreso nuevo.
+                </span>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWithdrawModalOpen(false);
+                    setSelectedGoal(null);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-gray-800 text-gray-300 text-xs font-semibold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isWithdrawing}
+                  className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-50"
+                >
+                  {isWithdrawing ? 'Procesando...' : 'Retirar Dinero'}
                 </button>
               </div>
             </form>
