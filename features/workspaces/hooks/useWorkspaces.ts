@@ -12,13 +12,20 @@ import {
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
+import { DEMO_WORKSPACES } from '@/lib/mock-demo-data';
+
 export function useWorkspaces() {
   const { isAuthenticated, user } = useAuthStore();
   const setWorkspaces = useWorkspaceStore((state) => state.setWorkspaces);
 
   return useQuery({
-    queryKey: ['workspaces', user?.email],
+    queryKey: ['workspaces', user?.email, isAuthenticated],
     queryFn: async () => {
+      if (!isAuthenticated) {
+        setWorkspaces(DEMO_WORKSPACES);
+        return DEMO_WORKSPACES;
+      }
+
       let data = await getUserWorkspaces(user?.email || undefined);
       
       // Si el usuario es nuevo y no tiene ningún workspace creado aún en la BD:
@@ -40,8 +47,8 @@ export function useWorkspaces() {
       setWorkspaces(data);
       return data;
     },
-    enabled: isAuthenticated && Boolean(user?.email),
-    refetchInterval: 4000,
+    enabled: true,
+    refetchInterval: isAuthenticated ? 4000 : false,
     refetchIntervalInBackground: false,
   });
 }

@@ -72,6 +72,7 @@ export default function DashboardLayout({
     }
   }, [hasPartner, workspaces, activeWorkspaceId, switchWorkspaceType]);
 
+  // Si no está autenticado, inicializar el workspace demo si no hay ninguno activo
   useEffect(() => {
     if (isMounted) {
       const storedToken = localStorage.getItem('dualis_auth_token');
@@ -83,7 +84,7 @@ export default function DashboardLayout({
         router.replace('/login');
       }
     }
-  }, [isMounted, isAuthenticated, token, router]);
+  }, [isMounted, isAuthenticated, token, activeWorkspaceId]);
 
   const currentWorkspace: WorkspaceType = activeWorkspaceType === 'COUPLE' || activeWorkspaceType === 'couple' ? 'couple' : 'personal';
 
@@ -93,7 +94,7 @@ export default function DashboardLayout({
       <div className="min-h-screen bg-[#090d16] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-gray-400 font-medium">Verificando sesión...</p>
+          <p className="text-xs text-gray-400 font-medium">Iniciando Dualis...</p>
         </div>
       </div>
     );

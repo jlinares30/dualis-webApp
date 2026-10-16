@@ -26,6 +26,8 @@ import { useTransactions, useDeleteTransaction, CreateTransactionModal, Transact
 import { useAccounts } from '@/features/accounts';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { getTransactionIconAndStyle } from '@/lib/transaction-icons';
+import { useGuestGate } from '@/hooks';
+import { AuthModal } from '@/features/auth';
 
 function TransactionsContent({ workspace }: { workspace?: WorkspaceType }) {
   const router = useRouter();
@@ -52,6 +54,17 @@ function TransactionsContent({ workspace }: { workspace?: WorkspaceType }) {
   const pageSize = 15;
 
   const { mutateAsync: deleteTxMut, isPending: isDeletingTx } = useDeleteTransaction();
+  const { isGuest, isAuthModalOpen, requireAuth, closeAuthModal, gateConfig } = useGuestGate();
+
+  const handleOpenCreateModal = () => {
+    requireAuth(
+      () => setIsModalOpen(true),
+      {
+        title: 'Registra tus Transacciones',
+        subtitle: 'Crea tu cuenta gratis para auditar tus ingresos y gastos en tiempo real.',
+      }
+    );
+  };
 
   // Debounce para no saturar peticiones mientras escribe en el buscador
   React.useEffect(() => {
@@ -221,7 +234,7 @@ function TransactionsContent({ workspace }: { workspace?: WorkspaceType }) {
             <span>{isExporting ? 'Exportando...' : 'Exportar CSV'}</span>
           </button>
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenCreateModal}
             className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer"
           >
             <Plus className="w-4 h-4" /> Registrar Movimiento
@@ -499,8 +512,16 @@ function TransactionsContent({ workspace }: { workspace?: WorkspaceType }) {
                       <button
                         type="button"
                         onClick={() => {
-                          setTransactionToEdit(tx);
-                          setIsModalOpen(true);
+                          requireAuth(
+                            () => {
+                              setTransactionToEdit(tx);
+                              setIsModalOpen(true);
+                            },
+                            {
+                              title: 'Editar Transacción',
+                              subtitle: 'Crea tu cuenta gratis para modificar detalles de tus transacciones.',
+                            }
+                          );
                         }}
                         className="p-2 text-gray-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded-xl transition-all cursor-pointer"
                         title="Editar transacción"
@@ -510,7 +531,15 @@ function TransactionsContent({ workspace }: { workspace?: WorkspaceType }) {
 
                       <button
                         type="button"
-                        onClick={() => setTransactionToDelete(tx)}
+                        onClick={() => {
+                          requireAuth(
+                            () => setTransactionToDelete(tx),
+                            {
+                              title: 'Eliminar Transacción',
+                              subtitle: 'Crea tu cuenta gratis para gestionar o eliminar tus movimientos.',
+                            }
+                          );
+                        }}
                         className="p-2 text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all cursor-pointer"
                         title="Eliminar movimiento y revertir saldo"
                       >
@@ -634,6 +663,14 @@ function TransactionsContent({ workspace }: { workspace?: WorkspaceType }) {
           </div>
         </div>
       )}
+
+      {/* Guest Auth Gate Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        title={gateConfig.title}
+        subtitle={gateConfig.subtitle}
+      />
     </div>
   );
 }

@@ -24,6 +24,8 @@ import { useAccounts, useCreateTransaction } from '@/hooks';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 import { CustomExchangeRateInput } from '@/components/ui/custom-exchange-rate-input';
+import { useGuestGate } from '@/hooks';
+import { AuthModal } from '@/features/auth';
 
 const COMMON_CURRENCIES = ['PEN', 'USD', 'EUR', 'COP', 'MXN', 'CLP', 'ARS', 'BRL'];
 
@@ -43,6 +45,7 @@ export default function InvestmentsPage() {
   const { mutateAsync: createTxMut } = useCreateTransaction();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { isGuest, isAuthModalOpen, requireAuth, closeAuthModal, gateConfig } = useGuestGate();
 
   // Estado para Actualizar Valorización / Editar
   const [editingInv, setEditingInv] = useState<InvestmentDTO | null>(null);
@@ -216,7 +219,15 @@ export default function InvestmentsPage() {
         </div>
 
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            requireAuth(
+              () => setIsModalOpen(true),
+              {
+                title: 'Multiplica tu Patrimonio con Inversiones',
+                subtitle: 'Crea tu cuenta gratis para hacer seguimiento a tus portafolios, acciones, fondos y criptos.',
+              }
+            );
+          }}
           className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Registrar Inversión
@@ -361,7 +372,15 @@ export default function InvestmentsPage() {
                     <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                       <button
                         type="button"
-                        onClick={() => handleOpenEdit(inv)}
+                        onClick={() => {
+                          requireAuth(
+                            () => handleOpenEdit(inv),
+                            {
+                              title: 'Actualizar Inversión',
+                              subtitle: 'Crea tu cuenta gratis para gestionar y actualizar tus activos e inversiones.',
+                            }
+                          );
+                        }}
                         className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors cursor-pointer"
                         title="Actualizar valorización"
                       >
@@ -369,7 +388,15 @@ export default function InvestmentsPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleOpenDelete(inv)}
+                        onClick={() => {
+                          requireAuth(
+                            () => handleOpenDelete(inv),
+                            {
+                              title: 'Eliminar Inversión',
+                              subtitle: 'Crea tu cuenta gratis para liquidar o remover inversiones.',
+                            }
+                          );
+                        }}
                         className="p-1.5 rounded-lg text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                         title="Eliminar o liquidar inversión"
                       >
@@ -660,6 +687,14 @@ export default function InvestmentsPage() {
           </div>
         </div>
       )}
+
+      {/* Guest Auth Gate Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        title={gateConfig.title}
+        subtitle={gateConfig.subtitle}
+      />
     </div>
   );
 }

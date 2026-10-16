@@ -5,6 +5,9 @@ import { PlusCircle, Split } from 'lucide-react';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { CreateTransactionModal } from '@/features/transactions/components/create-transaction-modal';
 
+import { useGuestGate } from '@/hooks';
+import { AuthModal } from '@/features/auth';
+
 import { WorkspaceType } from '@/types';
 
 interface QuickActionsProps {
@@ -14,15 +17,26 @@ interface QuickActionsProps {
 export function QuickActions({ workspace = 'personal' }: QuickActionsProps) {
   const { hasPartner } = useWorkspaceStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { isGuest, isAuthModalOpen, requireAuth, closeAuthModal, gateConfig } = useGuestGate();
 
   const isCouple = hasPartner && (workspace === 'couple' || workspace === 'COUPLE');
+
+  const handleOpenTransaction = () => {
+    requireAuth(
+      () => setIsModalOpen(true),
+      {
+        title: 'Registra tus gastos en Dualis',
+        subtitle: 'Crea tu cuenta gratis para registrar gastos reales, categorizarlos y sincronizarlos.',
+      }
+    );
+  };
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
         {/* Agregar Gasto Button */}
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenTransaction}
           className="flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm shadow-lg shadow-indigo-600/25 transition-all duration-200 active:scale-95 cursor-pointer"
         >
           <PlusCircle className="w-4 h-4" />
@@ -32,7 +46,7 @@ export function QuickActions({ workspace = 'personal' }: QuickActionsProps) {
         {/* Crear Transacción Dividida Button (Solo visible en modo pareja cuando está activado) */}
         {isCouple && (
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleOpenTransaction}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2.5 px-4 py-2.5 rounded-xl bg-gray-800/90 hover:bg-gray-700/90 border border-gray-700/80 text-emerald-400 font-medium text-sm transition-all duration-200 active:scale-95 shadow-md cursor-pointer"
           >
             <Split className="w-4 h-4" />
@@ -46,6 +60,14 @@ export function QuickActions({ workspace = 'personal' }: QuickActionsProps) {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         defaultType="expense"
+      />
+
+      {/* Guest Auth Gate Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        title={gateConfig.title}
+        subtitle={gateConfig.subtitle}
       />
     </>
   );

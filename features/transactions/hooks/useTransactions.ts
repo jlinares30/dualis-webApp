@@ -5,6 +5,8 @@ import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { clearBudgetProgressCache } from '@/features/budgets';
 
+import { DEMO_TRANSACTIONS } from '@/lib/mock-demo-data';
+
 export function useTransactions(
   page = 0,
   size = 10,
@@ -22,9 +24,32 @@ export function useTransactions(
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
 
   return useQuery({
-    queryKey: ['transactions', activeWorkspaceId, page, size, accountId, type, search, startDate, endDate, categoryId],
-    queryFn: () =>
-      getTransactions({
+    queryKey: ['transactions', activeWorkspaceId, page, size, accountId, type, search, startDate, endDate, categoryId, isAuthenticated],
+    queryFn: () => {
+      if (!isAuthenticated) {
+        let filtered = [...DEMO_TRANSACTIONS];
+        if (type) filtered = filtered.filter((t) => t.type === type);
+        if (accountId) filtered = filtered.filter((t) => t.accountId === accountId);
+        if (search) {
+          const lower = search.toLowerCase();
+          filtered = filtered.filter(
+            (t) =>
+              t.description?.toLowerCase().includes(lower) ||
+              t.categoryName?.toLowerCase().includes(lower)
+          );
+        }
+        const start = page * size;
+        const paged = filtered.slice(start, start + size);
+        return {
+          content: paged,
+          totalElements: filtered.length,
+          totalPages: Math.ceil(filtered.length / size) || 1,
+          size,
+          number: page,
+        };
+      }
+
+      return getTransactions({
         workspaceId: activeWorkspaceId!,
         page,
         size,
@@ -34,9 +59,10 @@ export function useTransactions(
         search,
         startDate,
         endDate,
-      }),
-    enabled: isAuthenticated && Boolean(isValidUuid),
-    refetchInterval: hasPartner ? 5000 : false,
+      });
+    },
+    enabled: (!isAuthenticated) || Boolean(isValidUuid),
+    refetchInterval: isAuthenticated && hasPartner ? 5000 : false,
     refetchIntervalInBackground: false,
   });
 }
