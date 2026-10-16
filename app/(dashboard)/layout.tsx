@@ -11,6 +11,7 @@ import { useWorkspaces, useAccounts } from '@/hooks';
 import { useUserProfile } from '@/features/auth/hooks/useUserProfile';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 import { OnboardingModal } from '@/features/onboarding';
+import { expireSession, isTokenExpired } from '@/lib/session';
 
 export default function DashboardLayout({
   children,
@@ -73,17 +74,22 @@ export default function DashboardLayout({
 
   // Si no está autenticado, inicializar el workspace demo si no hay ninguno activo
   useEffect(() => {
-    if (isMounted && !isAuthenticated && !token) {
-      if (!activeWorkspaceId) {
-        useWorkspaceStore.getState().setActiveWorkspace('demo-workspace-0000-0000-0000-000000000001', 'personal');
+    if (isMounted) {
+      const storedToken = localStorage.getItem('dualis_auth_token');
+      if (storedToken && isTokenExpired(storedToken)) {
+        expireSession();
+        return;
+      }
+      if (!isAuthenticated && !token && !storedToken) {
+        router.replace('/login');
       }
     }
   }, [isMounted, isAuthenticated, token, activeWorkspaceId]);
 
   const currentWorkspace: WorkspaceType = activeWorkspaceType === 'COUPLE' || activeWorkspaceType === 'couple' ? 'couple' : 'personal';
 
-  // Mostrar un loader inicial solo mientras se monta en el cliente
-  if (!isMounted) {
+  // Mostrar un loader mientras se verifica el estado de sesión
+  if (!isMounted || (token && isTokenExpired(token)) || (!isAuthenticated && !token && (typeof window !== 'undefined' && !localStorage.getItem('dualis_auth_token')))) {
     return (
       <div className="min-h-screen bg-[#090d16] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
