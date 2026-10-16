@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { WorkspaceType } from '@/types';
@@ -18,7 +17,6 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
@@ -81,7 +79,9 @@ export default function DashboardLayout({
         return;
       }
       if (!isAuthenticated && !token && !storedToken) {
-        router.replace('/login');
+        if (!activeWorkspaceId) {
+          useWorkspaceStore.getState().setActiveWorkspace('demo-workspace-0000-0000-0000-000000000001', 'personal');
+        }
       }
     }
   }, [isMounted, isAuthenticated, token, activeWorkspaceId]);
@@ -89,7 +89,7 @@ export default function DashboardLayout({
   const currentWorkspace: WorkspaceType = activeWorkspaceType === 'COUPLE' || activeWorkspaceType === 'couple' ? 'couple' : 'personal';
 
   // Mostrar un loader mientras se verifica el estado de sesión
-  if (!isMounted || (token && isTokenExpired(token)) || (!isAuthenticated && !token && (typeof window !== 'undefined' && !localStorage.getItem('dualis_auth_token')))) {
+  if (!isMounted || (token && isTokenExpired(token))) {
     return (
       <div className="min-h-screen bg-[#090d16] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
