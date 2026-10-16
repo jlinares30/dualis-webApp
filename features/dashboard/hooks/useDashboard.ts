@@ -3,6 +3,8 @@ import { getDashboardSummary } from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
+import { DEMO_DASHBOARD_SUMMARY } from '@/lib/mock-demo-data';
+
 export function useDashboardSummary() {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const hasPartner = useWorkspaceStore((state) => state.hasPartner);
@@ -11,10 +13,15 @@ export function useDashboardSummary() {
   const isValidUuid = activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId);
 
   return useQuery({
-    queryKey: ['dashboardSummary', activeWorkspaceId],
-    queryFn: () => getDashboardSummary(activeWorkspaceId!),
-    enabled: isAuthenticated && Boolean(isValidUuid),
-    refetchInterval: hasPartner ? 5000 : false,
+    queryKey: ['dashboardSummary', activeWorkspaceId, isAuthenticated],
+    queryFn: () => {
+      if (!isAuthenticated) {
+        return DEMO_DASHBOARD_SUMMARY;
+      }
+      return getDashboardSummary(activeWorkspaceId!);
+    },
+    enabled: (!isAuthenticated) || Boolean(isValidUuid),
+    refetchInterval: isAuthenticated && hasPartner ? 5000 : false,
     refetchIntervalInBackground: false,
   });
 }

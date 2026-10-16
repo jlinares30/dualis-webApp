@@ -4,14 +4,21 @@ import { CreateGoalRequest } from '@/types';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 
+import { DEMO_GOALS } from '@/lib/mock-demo-data';
+
 export function useGoals() {
   const activeWorkspaceId = useWorkspaceStore((state) => state.activeWorkspaceId);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
 
   return useQuery({
-    queryKey: ['goals', activeWorkspaceId],
-    queryFn: () => getGoals(activeWorkspaceId!),
-    enabled: isAuthenticated && Boolean(activeWorkspaceId),
+    queryKey: ['goals', activeWorkspaceId, isAuthenticated],
+    queryFn: () => {
+      if (!isAuthenticated) {
+        return DEMO_GOALS;
+      }
+      return getGoals(activeWorkspaceId!);
+    },
+    enabled: (!isAuthenticated) || Boolean(activeWorkspaceId),
   });
 }
 

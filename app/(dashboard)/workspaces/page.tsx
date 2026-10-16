@@ -20,6 +20,8 @@ import {
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useWorkspaceDetails, useInviteCode, useJoinWorkspace, useWorkspaces } from '@/hooks';
+import { useGuestGate } from '@/hooks';
+import { AuthModal } from '@/features/auth';
 
 export default function WorkspacesPage() {
   const { user } = useAuthStore();
@@ -42,6 +44,7 @@ export default function WorkspacesPage() {
   const [joinCode, setJoinCode] = useState('');
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinSuccess, setJoinSuccess] = useState<string | null>(null);
+  const { isGuest, isAuthModalOpen, requireAuth, closeAuthModal, gateConfig } = useGuestGate();
 
   const activeWs = workspaceDetails || workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
   const isCouple = activeWs?.type === 'COUPLE' || (activeWs?.type as any) === 'couple';
@@ -56,34 +59,42 @@ export default function WorkspacesPage() {
 
   const handleJoinSpace = async (e: React.FormEvent) => {
     e.preventDefault();
-    setJoinError(null);
-    setJoinSuccess(null);
+    requireAuth(
+      async () => {
+        setJoinError(null);
+        setJoinSuccess(null);
 
-    const cleanCode = joinCode.trim().toUpperCase();
-    if (!cleanCode) {
-      setJoinError('Ingresa un código de invitación de 8 caracteres');
-      return;
-    }
+        const cleanCode = joinCode.trim().toUpperCase();
+        if (!cleanCode) {
+          setJoinError('Ingresa un código de invitación de 8 caracteres');
+          return;
+        }
 
-    try {
-      const joined = await joinWorkspaceMut({
-        code: cleanCode,
-        partnerEmail: user?.email || '',
-      });
+        try {
+          const joined = await joinWorkspaceMut({
+            code: cleanCode,
+            partnerEmail: user?.email || '',
+          });
 
-      if (joined?.id) {
-        setActiveWorkspace(joined.id, 'COUPLE');
-        linkPartner('Pareja', cleanCode);
-        setJoinSuccess('¡Te has unido exitosamente al Espacio Compartido de tu pareja!');
-        setJoinCode('');
-      } else {
-        setJoinSuccess('Vinculación registrada correctamente.');
-        setJoinCode('');
+          if (joined?.id) {
+            setActiveWorkspace(joined.id, 'COUPLE');
+            linkPartner('Pareja', cleanCode);
+            setJoinSuccess('¡Te has unido exitosamente al Espacio Compartido de tu pareja!');
+            setJoinCode('');
+          } else {
+            setJoinSuccess('Vinculación registrada correctamente.');
+            setJoinCode('');
+          }
+        } catch (err: any) {
+          console.error('Error al unirse al espacio:', err);
+          setJoinError(err?.message || 'Código de invitación inválido o no encontrado en el servidor.');
+        }
+      },
+      {
+        title: 'Vincular Pareja y Espacio Compartido',
+        subtitle: 'Crea tu cuenta gratis para unirte al espacio de tu pareja y compartir finanzas.',
       }
-    } catch (err: any) {
-      console.error('Error al unirse al espacio:', err);
-      setJoinError(err?.message || 'Código de invitación inválido o no encontrado en el servidor.');
-    }
+    );
   };
 
   const membersList = activeWs?.members || [];
@@ -422,6 +433,14 @@ export default function WorkspacesPage() {
           </div>
         )}
       </div>
+
+      {/* Guest Auth Gate Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        title={gateConfig.title}
+        subtitle={gateConfig.subtitle}
+      />
     </div>
   );
 }

@@ -31,6 +31,8 @@ import {
 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
+import { useGuestGate } from '@/hooks';
+import { AuthModal } from '@/features/auth';
 import { useWorkspaceStore, DefaultSplitRule, ClosedWorkspaceSnapshot } from '@/lib/stores/useWorkspaceStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 import { useUpdateUserProfile } from '@/features/auth';
@@ -43,6 +45,7 @@ import { formatCurrency, capitalize } from '@/lib/utils';
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const { isGuest, isAuthModalOpen, requireAuth, closeAuthModal, gateConfig } = useGuestGate();
   const { mutateAsync: updateProfile, isPending } = useUpdateUserProfile();
   const { data: inviteData } = useInviteCode();
   const { mutateAsync: joinWorkspaceMut, isPending: isJoining } = useJoinWorkspace();
@@ -165,66 +168,77 @@ export default function SettingsPage() {
     '';
 
   const handleGenerateCoupleCode = async () => {
-    setJoinError(null);
-    setJoinSuccess(null);
-    try {
-      const created = await createWorkspaceMut({
-        name: 'Espacio Compartido Pareja',
-        description: 'Finanzas compartidas en pareja',
-        type: 'COUPLE',
-        currency: currency,
-        ownerEmail: user?.email || email,
-      });
+    requireAuth(async () => {
+      setJoinError(null);
+      setJoinSuccess(null);
+      try {
+        const created = await createWorkspaceMut({
+          name: 'Espacio Compartido Pareja',
+          description: 'Finanzas compartidas en pareja',
+          type: 'COUPLE',
+          currency: currency,
+          ownerEmail: user?.email || email,
+        });
 
-      if (created?.id) {
-        setActiveWorkspace(created.id, 'COUPLE');
-        const codeToLink = created.invitationCode || created.inviteCode || 'Código Generado';
-        linkPartner(partnerInputName || 'Pareja', codeToLink, selectedRule);
-        queryClient.invalidateQueries({ queryKey: ['workspaces'] });
-        queryClient.invalidateQueries({ queryKey: ['inviteCode'] });
-        setJoinSuccess(`¡Espacio de Pareja creado con éxito! Tu código es: ${codeToLink}`);
+        if (created?.id) {
+          setActiveWorkspace(created.id, 'COUPLE');
+          const codeToLink = created.invitationCode || created.inviteCode || 'Código Generado';
+          linkPartner(partnerInputName || 'Pareja', codeToLink, selectedRule);
+          queryClient.invalidateQueries({ queryKey: ['workspaces'] });
+          queryClient.invalidateQueries({ queryKey: ['inviteCode'] });
+          setJoinSuccess(`¡Espacio de Pareja creado con éxito! Tu código es: ${codeToLink}`);
+        }
+      } catch (err: any) {
+        console.error('Error al crear espacio pareja:', err);
+        setJoinError(err?.message || 'Error al generar el espacio de pareja.');
       }
-    } catch (err: any) {
-      console.error('Error al crear espacio pareja:', err);
-      setJoinError(err?.message || 'Error al generar el espacio de pareja.');
-    }
+    }, {
+      title: 'Crear Espacio de Pareja',
+      subtitle: 'Crea tu cuenta gratis para generar un código único de vinculación con tu pareja.',
+    });
   };
 
   const handleJoinPartner = async () => {
-    setJoinError(null);
-    setJoinSuccess(null);
-    if (!inviteCodeInput.trim()) {
-      setJoinError('Ingresa el código de 8 caracteres de tu pareja (ej. DUALXXXX)');
-      return;
-    }
-
-    try {
-      const joined = await joinWorkspaceMut({
-        code: inviteCodeInput.trim(),
-        partnerEmail: user?.email || email,
-      });
-
-      if (joined?.id) {
-        setActiveWorkspace(joined.id, 'COUPLE');
-        linkPartner(partnerInputName || 'Pareja', inviteCodeInput.trim(), selectedRule);
-        setJoinSuccess('¡Te has vinculado exitosamente al Espacio Compartido de tu pareja!');
-      } else {
-        linkPartner(partnerInputName || 'Pareja', inviteCodeInput.trim(), selectedRule);
-        setJoinSuccess('Vinculado en modo local.');
+    requireAuth(async () => {
+      setJoinError(null);
+      setJoinSuccess(null);
+      if (!inviteCodeInput.trim()) {
+        setJoinError('Ingresa el código de 8 caracteres de tu pareja (ej. DUALXXXX)');
+        return;
       }
-    } catch (err: any) {
-      console.error('Error al unirse al espacio mediante código:', err);
-      setJoinError(err?.message || 'Código de invitación inválido o no encontrado en el servidor.');
-    }
+
+      try {
+        const joined = await joinWorkspaceMut({
+          code: inviteCodeInput.trim(),
+          partnerEmail: user?.email || email,
+        });
+
+        if (joined?.id) {
+          setActiveWorkspace(joined.id, 'COUPLE');
+          linkPartner(partnerInputName || 'Pareja', inviteCodeInput.trim(), selectedRule);
+          setJoinSuccess('¡Te has vinculado exitosamente al Espacio Compartido de tu pareja!');
+        } else {
+          linkPartner(partnerInputName || 'Pareja', inviteCodeInput.trim(), selectedRule);
+          setJoinSuccess('Vinculado en modo local.');
+        }
+      } catch (err: any) {
+        console.error('Error al unirse al espacio mediante código:', err);
+        setJoinError(err?.message || 'Código de invitación inválido o no encontrado en el servidor.');
+      }
+    }, {
+      title: 'Unirse al Espacio de tu Pareja',
+      subtitle: 'Crea tu cuenta gratis para sincronizar gastos e ingresos con tu pareja.',
+    });
   };
 
   const openUnlinkModalWithSnapshot = async () => {
-    setJoinError(null);
-    setJoinSuccess(null);
-    setIsCheckingBalance(true);
+    requireAuth(async () => {
+      setJoinError(null);
+      setJoinSuccess(null);
+      setIsCheckingBalance(true);
 
-    const currentUserEmail = user?.email || email || '';
-    const coupleCurrency = currency || 'PEN';
+      const currentUserEmail = user?.email || email || '';
+      const coupleCurrency = currency || 'PEN';
     const partnerDisplay = capitalize(
       (resolvedPartnerName && resolvedPartnerName.toLowerCase() !== 'pareja' ? resolvedPartnerName : null) ||
       (partnerInputName && partnerInputName.toLowerCase() !== 'pareja' ? partnerInputName : null) ||
@@ -280,6 +294,10 @@ export default function SettingsPage() {
       setClosingSnapshot(calculatedSnapshot);
       setShowUnlinkModal(true);
     }
+    }, {
+      title: 'Desvincular Espacio de Pareja',
+      subtitle: 'Crea tu cuenta gratis para gestionar tus espacios y vínculos de pareja.',
+    });
   };
 
   const confirmFinalUnlink = async () => {
@@ -441,41 +459,46 @@ export default function SettingsPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const personalWs = workspaces.find((w) => w.type === 'INDIVIDUAL' || (w.type as any) === 'personal');
-    const oldPersonalCurrency = personalWs?.currency || user?.preferredCurrency || 'PEN';
-    const oldCoupleCurrency = coupleWs?.currency || 'PEN';
+    requireAuth(async () => {
+      const personalWs = workspaces.find((w) => w.type === 'INDIVIDUAL' || (w.type as any) === 'personal');
+      const oldPersonalCurrency = personalWs?.currency || user?.preferredCurrency || 'PEN';
+      const oldCoupleCurrency = coupleWs?.currency || 'PEN';
 
-    const personalChanged = personalWs?.id && currency !== oldPersonalCurrency;
-    const coupleChanged = coupleWs?.id && coupleCurrency !== oldCoupleCurrency;
+      const personalChanged = personalWs?.id && currency !== oldPersonalCurrency;
+      const coupleChanged = coupleWs?.id && coupleCurrency !== oldCoupleCurrency;
 
-    // Si cambió la moneda de algún espacio, verificar si existen presupuestos
-    if (personalChanged || coupleChanged) {
-      const targetScope = personalChanged ? 'personal' : 'couple';
-      const wsId = personalChanged ? personalWs!.id : coupleWs!.id;
-      const oldCurr = personalChanged ? oldPersonalCurrency : oldCoupleCurrency;
-      const newCurr = personalChanged ? currency : coupleCurrency;
+      // Si cambió la moneda de algún espacio, verificar si existen presupuestos
+      if (personalChanged || coupleChanged) {
+        const targetScope = personalChanged ? 'personal' : 'couple';
+        const wsId = personalChanged ? personalWs!.id : coupleWs!.id;
+        const oldCurr = personalChanged ? oldPersonalCurrency : oldCoupleCurrency;
+        const newCurr = personalChanged ? currency : coupleCurrency;
 
-      try {
-        const existingBudgets = await getBudgets(wsId);
-        const hasBudgets = existingBudgets && existingBudgets.length > 0;
+        try {
+          const existingBudgets = await getBudgets(wsId);
+          const hasBudgets = existingBudgets && existingBudgets.length > 0;
 
-        if (hasBudgets) {
-          setPendingCurrencyData({
-            targetScope,
-            newCurrency: newCurr,
-            oldCurrency: oldCurr,
-            workspaceId: wsId,
-          });
-          setAffectedBudgets(existingBudgets || []);
-          setShowCurrencyModal(true);
-          return;
+          if (hasBudgets) {
+            setPendingCurrencyData({
+              targetScope,
+              newCurrency: newCurr,
+              oldCurrency: oldCurr,
+              workspaceId: wsId,
+            });
+            setAffectedBudgets(existingBudgets || []);
+            setShowCurrencyModal(true);
+            return;
+          }
+        } catch (checkErr) {
+          console.warn('No se pudieron precargar presupuestos:', checkErr);
         }
-      } catch (checkErr) {
-        console.warn('No se pudieron precargar presupuestos:', checkErr);
       }
-    }
 
-    await executeSaveSettings(null);
+      await executeSaveSettings(null);
+    }, {
+      title: 'Guardar Configuración',
+      subtitle: 'Crea tu cuenta gratis para personalizar tus datos y guardar tus preferencias de moneda.',
+    });
   };
 
   return (
@@ -1408,6 +1431,15 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Modal de autenticacion para modo demo */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={closeAuthModal}
+        title={gateConfig?.title}
+        subtitle={gateConfig?.subtitle}
+        defaultIsRegister={true}
+      />
     </div>
   );
 }

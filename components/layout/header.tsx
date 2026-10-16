@@ -244,13 +244,25 @@ export function Header({ currentWorkspace, onWorkspaceChange, onOpenMobileMenu }
             </button>
           </div>
         ) : (
-          <Link
-            href="/login"
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
-          >
-            <LogIn className="w-4 h-4" />
-            <span>Iniciar Sesión</span>
-          </Link>
+          <div className="flex items-center gap-2">
+            <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-[11px] font-semibold text-amber-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              <span>Modo Explorador (Demo)</span>
+            </div>
+            <Link
+              href="/login"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-800/80 hover:bg-gray-700 border border-gray-700/70 text-gray-200 text-xs font-semibold transition-all cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Ingresar</span>
+            </Link>
+            <Link
+              href="/register"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+            >
+              <span>Crear Cuenta</span>
+            </Link>
+          </div>
         )}
       </div>
     </header>
