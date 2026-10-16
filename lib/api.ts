@@ -1,3 +1,5 @@
+import { expireSession, isTokenExpired } from './session';
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 
 export class ApiError extends Error {
@@ -16,7 +18,13 @@ export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('dualis_auth_token') : null;
+  const isPublicAuth = endpoint === '/auth/login' || endpoint === '/auth/register';
+  const token = !isPublicAuth && typeof window !== 'undefined' ? localStorage.getItem('dualis_auth_token') : null;
+
+  if (token && isTokenExpired(token)) {
+    expireSession();
+    throw new ApiError(401, 'Tu sesión ha expirado. Inicia sesión nuevamente.');
+  }
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -40,21 +48,11 @@ export async function apiFetch<T>(
       errorData = null;
     }
 
-    if (response.status === 401 && typeof window !== 'undefined') {
-      // Manejar token expirado o no autorizado limpiando el almacenamiento local
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('dualis') || key.includes('dualis'))) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach((k) => localStorage.removeItem(k));
-
-      // Si no estamos ya en rutas de autenticación, redirigir a login
-      if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/register')) {
-        window.location.href = '/login?expired=true';
-      }
+    // A generic 403 can mean insufficient permissions, not an expired session.
+    // Ignore responses from an older session if the user has since logged in again.
+    if (token && typeof window !== 'undefined' && localStorage.getItem('dualis_auth_token') === token &&
+      (response.status === 401 || (response.status === 403 && isTokenExpired(token)))) {
+      expireSession();
     }
 
 

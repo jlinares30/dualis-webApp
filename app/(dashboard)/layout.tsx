@@ -11,6 +11,7 @@ import { useWorkspaces, useAccounts } from '@/hooks';
 import { useUserProfile } from '@/features/auth/hooks/useUserProfile';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 import { OnboardingModal } from '@/features/onboarding';
+import { expireSession, isTokenExpired } from '@/lib/session';
 
 export default function DashboardLayout({
   children,
@@ -74,6 +75,10 @@ export default function DashboardLayout({
   useEffect(() => {
     if (isMounted) {
       const storedToken = localStorage.getItem('dualis_auth_token');
+      if (storedToken && isTokenExpired(storedToken)) {
+        expireSession();
+        return;
+      }
       if (!isAuthenticated && !token && !storedToken) {
         router.replace('/login');
       }
@@ -83,7 +88,7 @@ export default function DashboardLayout({
   const currentWorkspace: WorkspaceType = activeWorkspaceType === 'COUPLE' || activeWorkspaceType === 'couple' ? 'couple' : 'personal';
 
   // Mostrar un loader mientras se verifica el estado de sesión
-  if (!isMounted || (!isAuthenticated && !token && (typeof window !== 'undefined' && !localStorage.getItem('dualis_auth_token')))) {
+  if (!isMounted || (token && isTokenExpired(token)) || (!isAuthenticated && !token && (typeof window !== 'undefined' && !localStorage.getItem('dualis_auth_token')))) {
     return (
       <div className="min-h-screen bg-[#090d16] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
