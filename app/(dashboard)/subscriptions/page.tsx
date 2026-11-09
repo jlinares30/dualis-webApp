@@ -1,12 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Calendar, Plus, CheckCircle2, Clock, Trash2, Home, Zap, Tv, Shield, BookOpen, Layers, TrendingUp, Wallet, Check, Sparkles, Lock, UserCheck, Eye, EyeOff, ChevronDown, Sliders, Activity, Receipt, X, AlertTriangle, Search, Filter, ArrowUpRight } from 'lucide-react';
+import { Calendar, Plus, CheckCircle2, Clock, Trash2, Home, Zap, Tv, Shield, BookOpen, Layers, TrendingUp, Wallet, Check, Sparkles, Lock, UserCheck, Eye, EyeOff, ChevronDown, Sliders, Activity, Receipt, X, AlertTriangle, Search, Filter, ArrowUpRight, ChevronLeft, ChevronRight, History, Undo2 } from 'lucide-react';
 import { formatCurrency, capitalize } from '@/lib/utils';
 import {
   useSubscriptions,
   useCreateSubscription,
-  useToggleSubscriptionPaid,
   useDeleteSubscription,
   useSalaryDistributionConfig,
   useSaveSalaryDistributionConfig,
@@ -15,6 +14,8 @@ import { useSplitRules, useCreateSplitRule, useUpdateSplitRule, useCreateTransac
 import { useAccounts } from '@/features/accounts';
 import { useInvestments } from '@/features/investments';
 import { SalaryDistributionFlow } from '@/features/subscriptions/components/salary-distribution-flow';
+import { SubscriptionHistoryModal } from '@/features/subscriptions/components/subscription-history-modal';
+import { usePaySubscription, useUndoSubscriptionPayment } from '@/features/subscriptions/hooks/useSubscriptions';
 import { SalaryDistributionConfig } from '@/features/subscriptions/types/subscriptions';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
@@ -38,9 +39,49 @@ export default function SubscriptionsPage() {
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
   const currency = activeWs?.currency || 'PEN';
 
-  const { data: subs = [], isLoading } = useSubscriptions();
+  // Mes que se está viendo / pagando. Cada mes tiene su propio estado de pago e historial.
+  const [period, setPeriod] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  });
+  const todayPeriod = useMemo(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  }, []);
+  const isCurrentPeriod = period.year === todayPeriod.year && period.month === todayPeriod.month;
+  const periodLabel = new Date(period.year, period.month - 1, 1).toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
+  const shiftPeriod = (delta: number) => {
+    setPeriod((p) => {
+      const d = new Date(p.year, p.month - 1 + delta, 1);
+      return { year: d.getFullYear(), month: d.getMonth() + 1 };
+    });
+  };
+  const [historySub, setHistorySub] = useState<{ id: string; name: string } | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const { data: subs = [], isLoading } = useSubscriptions(period);
   const { mutateAsync: createSubMut, isPending: isCreating } = useCreateSubscription();
-  const { mutateAsync: togglePaidMut } = useToggleSubscriptionPaid();
+  const { mutateAsync: payMut } = usePaySubscription();
+  const { mutateAsync: undoPaymentMut } = useUndoSubscriptionPayment();
+
+  const payForPeriod = async (subId: string, extra?: { amount?: number; accountId?: string }) => {
+    setPaymentError(null);
+    try {
+      await payMut({ subId, payload: { periodYear: period.year, periodMonth: period.month, ...extra } });
+    } catch (err: unknown) {
+      setPaymentError(err instanceof Error ? err.message : 'No se pudo registrar el pago.');
+      throw err;
+    }
+  };
+
+  const undoForPeriod = async (subId: string) => {
+    setPaymentError(null);
+    try {
+      await undoPaymentMut({ subId, period });
+    } catch (err: unknown) {
+      setPaymentError(err instanceof Error ? err.message : 'No se pudo deshacer el pago.');
+    }
+  };
   const { mutateAsync: deleteSubMut } = useDeleteSubscription();
 
   // Hooks de persistencia de configuración de distribución de sueldo en backend
@@ -97,25 +138,12 @@ export default function SubscriptionsPage() {
 
     setIsProcessingPayment(true);
     try {
-      // Si seleccionó una cuenta o hay cuentas disponibles, opcionalmente creamos la transacción de gasto con el monto real
-      if (payingAccountId && activeWorkspaceId) {
-        const selectedAcc = [...accountsData, ...coupleAccountsData].find((a) => a.id === payingAccountId);
-        await createTxMut({
-          workspaceId: selectedAcc?.workspaceId || activeWorkspaceId,
-          accountId: payingAccountId,
-          amount: finalAmount,
-          currency: payingSub.currency || currency,
-          type: 'EXPENSE',
-          description: `Pago de servicio: ${payingSub.name}${payingSub.isVariable ? ' (Recibo mensual ajustado)' : ''}`,
-          transactionDate: new Date().toISOString(),
-        });
-        queryClient.invalidateQueries({ queryKey: ['accounts'] });
-        queryClient.invalidateQueries({ queryKey: ['transactions'] });
-        queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
-      }
-
-      // Marcar suscripción / pago recurrente como pagado este mes
-      await togglePaidMut(payingSub.id);
+      // El backend registra el pago del mes seleccionado y, si se eligió una cuenta,
+      // el gasto correspondiente en la misma operación.
+      await payForPeriod(payingSub.id, {
+        amount: finalAmount,
+        accountId: payingAccountId || undefined,
+      });
       setPayingSub(null);
       setActualPaidAmount('');
       setPayingAccountId('');
@@ -592,7 +620,10 @@ export default function SubscriptionsPage() {
     }
   };
 
-  const currentDay = new Date().getDate();
+  // Día de referencia para "vencido": hoy en el mes actual; en meses pasados todo lo impago está vencido,
+  // y en meses futuros nada lo está.
+  const isPastPeriod = period.year < todayPeriod.year || (period.year === todayPeriod.year && period.month < todayPeriod.month);
+  const currentDay = isCurrentPeriod ? new Date().getDate() : isPastPeriod ? 32 : 0;
 
   // Métricas avanzadas de compromisos y estados del mes (Multimoneda)
   const {
@@ -705,13 +736,13 @@ export default function SubscriptionsPage() {
           <div className="text-xl md:text-2xl font-black text-white tracking-tight">
             {formatCurrency(totalMonthlyCommitments, currency)}
           </div>
-          <p className="text-[11px] text-gray-500">Monto total presupuestado para este mes</p>
+          <p className="text-[11px] text-gray-500">Monto total presupuestado para {isCurrentPeriod ? 'este mes' : periodLabel}</p>
         </div>
 
         {/* Pagado este mes */}
         <div className="p-4 rounded-3xl bg-[#0f172a]/90 border border-emerald-500/20 shadow-xl space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-emerald-300">Pagado este Mes</span>
+            <span className="text-xs font-semibold text-emerald-300">{isCurrentPeriod ? 'Pagado este Mes' : 'Pagado en el mes'}</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
               {paidPercentage}% completado
             </span>
@@ -1062,6 +1093,45 @@ export default function SubscriptionsPage() {
         </div>
       )}
 
+      {/* Selector de mes: cada mes tiene su propio estado de pago */}
+      <div className="p-3 rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => shiftPeriod(-1)}
+            className="p-2 rounded-xl border border-gray-800 bg-gray-900/80 hover:bg-gray-800 text-gray-300 cursor-pointer"
+            aria-label="Mes anterior"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <span className="min-w-[150px] text-center text-sm font-bold text-white capitalize">{periodLabel}</span>
+          <button
+            type="button"
+            onClick={() => shiftPeriod(1)}
+            className="p-2 rounded-xl border border-gray-800 bg-gray-900/80 hover:bg-gray-800 text-gray-300 cursor-pointer"
+            aria-label="Mes siguiente"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+          {!isCurrentPeriod && (
+            <button
+              type="button"
+              onClick={() => setPeriod(todayPeriod)}
+              className="ml-1 px-3 py-1.5 rounded-xl text-xs font-bold text-amber-300 bg-amber-600/20 border border-amber-500/30 hover:bg-amber-600/30 cursor-pointer"
+            >
+              Mes actual
+            </button>
+          )}
+        </div>
+        {paymentError && (
+          <span className="text-xs text-rose-400 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> {paymentError}
+          </span>
+        )}
+      </div>
+
+      <SubscriptionHistoryModal subscription={historySub} onClose={() => setHistorySub(null)} />
+
       {/* Barra de Filtros, Búsqueda y Categorías */}
       {subs.length > 0 && (
         <div className="p-4 rounded-3xl bg-[#0f172a]/90 border border-gray-800/80 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -1282,7 +1352,7 @@ export default function SubscriptionsPage() {
                         <div className="flex items-center gap-1.5 mt-0.5">
                           {sub.isPaidThisMonth ? (
                             <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-                              <Check className="w-3 h-3" /> Pagado este mes
+                              <Check className="w-3 h-3" /> {isCurrentPeriod ? 'Pagado este mes' : `Pagado en ${periodLabel}`}
                             </span>
                           ) : isPastDue ? (
                             <span className="text-[10px] text-rose-400 font-bold flex items-center gap-1">
@@ -1340,7 +1410,7 @@ export default function SubscriptionsPage() {
                       requireAuth(
                         () => {
                           if (sub.isPaidThisMonth) {
-                            togglePaidMut(sub.id);
+                            undoForPeriod(sub.id);
                           } else if (isVariable) {
                             setPayingSub({
                               id: sub.id,
@@ -1352,7 +1422,7 @@ export default function SubscriptionsPage() {
                             setActualPaidAmount(String(sub.amount));
                             setPayingAccountId(accountsData[0]?.id || coupleAccountsData[0]?.id || '');
                           } else {
-                            togglePaidMut(sub.id);
+                            payForPeriod(sub.id).catch(() => undefined);
                           }
                         },
                         {
@@ -1371,10 +1441,10 @@ export default function SubscriptionsPage() {
                         : 'bg-amber-600/20 text-amber-300 border-amber-500/30 hover:bg-amber-600/30'
                     }`}
                   >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>
+                    {sub.isPaidThisMonth ? <Undo2 className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                    <span title={sub.isPaidThisMonth ? 'Clic para deshacer el pago de este mes' : undefined}>
                       {sub.isPaidThisMonth
-                        ? 'Pagado este Mes'
+                        ? (isCurrentPeriod ? 'Pagado este Mes' : 'Pagado')
                         : isPastDue
                         ? 'Pagar Ahora (Vencido)'
                         : isVariable
@@ -1412,6 +1482,20 @@ export default function SubscriptionsPage() {
                       <Receipt className="w-4 h-4" />
                     </button>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      requireAuth(() => setHistorySub({ id: sub.id, name: sub.name }), {
+                        title: 'Historial de pagos',
+                        subtitle: 'Crea tu cuenta gratis para guardar el historial de tus pagos fijos.',
+                      })
+                    }
+                    className="p-2 rounded-xl border border-gray-800 bg-gray-900/80 hover:bg-gray-800 text-gray-400 hover:text-amber-400 transition-colors cursor-pointer"
+                    title="Ver historial de pagos por mes"
+                  >
+                    <History className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             );
