@@ -8,6 +8,7 @@ export interface WorkspaceDTO {
   invitationCode?: string;
   inviteCode?: string;
   currency?: string;
+  ownerEmail?: string;
   members?: WorkspaceMemberDTO[];
   createdAt?: string;
   updatedAt?: string;

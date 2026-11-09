@@ -34,6 +34,8 @@ export interface TransactionDTO {
   paidByUserId?: string;
   paidByUserName?: string;
   splitRuleId?: string;
+  /** Share (0-100) of the shared expense assumed by the couple workspace owner. */
+  splitPartnerAPercentage?: number | null;
   createdAt?: string;
 }
 
@@ -52,6 +54,8 @@ export interface CreateTransactionRequest {
   originalCurrency?: string;
   transactionDate: string;
   splitRuleId?: string;
+  /** Share (0-100) of the shared expense assumed by the couple workspace owner (partner A). */
+  splitPartnerAPercentage?: number;
 }
 
 export interface Transaction {

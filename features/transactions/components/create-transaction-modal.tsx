@@ -3,7 +3,7 @@ import { X, Receipt, Split, Sparkles, Wallet, PieChart, Percent, DollarSign, Use
 import { useWorkspaceStore, DefaultSplitRule } from '@/lib/stores/useWorkspaceStore';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
-import { useCreateTransaction, useUpdateTransaction, useTransactions, useSplitRules, useCreateSplitRule, useUpdateSplitRule } from '@/hooks';
+import { useCreateTransaction, useUpdateTransaction, useTransactions, useSplitRules } from '@/hooks';
 import { useAccounts, useCreateAccount } from '@/hooks';
 import { useCategories, useCreateCategory } from '@/hooks';
 import { Transaction } from '../types/transactions';
@@ -44,6 +44,20 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
   const [splitMode, setSplitMode] = useState<DefaultSplitRule>(defaultSplitRule);
   const [userPercentage, setUserPercentage] = useState(defaultUserPercentage);
   const [fixedPartnerAmount, setFixedPartnerAmount] = useState('');
+  // When editing, the split is only re-sent if the user changed it (otherwise the stored split is kept).
+  const [splitTouched, setSplitTouched] = useState(false);
+  const changeSplitMode = (mode: DefaultSplitRule) => {
+    setSplitTouched(true);
+    setSplitMode(mode);
+  };
+  const changeUserPercentage = (value: number) => {
+    setSplitTouched(true);
+    setUserPercentage(value);
+  };
+  const changeFixedPartnerAmount = (value: string) => {
+    setSplitTouched(true);
+    setFixedPartnerAmount(value);
+  };
   const [allowNegativeBalance, setAllowNegativeBalance] = useState(false);
 
   // Estados para creación rápida de categoría personalizada
@@ -75,6 +89,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
         setUserPercentage(defaultUserPercentage);
       }
       setAllowNegativeBalance(false);
+      setSplitTouched(false);
       setErrorMessage(null);
     }
   }, [isOpen, transactionToEdit, defaultType, hasPartner, defaultSplitRule, defaultUserPercentage]);
@@ -101,8 +116,15 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
   const { mutateAsync: createCategory } = useCreateCategory();
   const { data: txPage } = useTransactions(0, 100);
   const { data: splitRules = [] } = useSplitRules();
-  const { mutateAsync: createSplitRuleMut } = useCreateSplitRule();
-  const { mutateAsync: updateSplitRuleMut } = useUpdateSplitRule();
+
+  // Partner A in the backend is always the couple workspace owner.
+  const isCoupleOwner = React.useMemo(() => {
+    const email = user?.email?.toLowerCase();
+    if (!email || !coupleWs) return true;
+    const ownerEmail =
+      coupleWs.ownerEmail || coupleWs.members?.find((m) => m.role === 'OWNER')?.userEmail;
+    return !ownerEmail || ownerEmail.toLowerCase() === email;
+  }, [user?.email, coupleWs]);
 
   // Lista combinada de cuentas
   const availableAccounts = React.useMemo(() => {
@@ -209,56 +231,38 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
         }
       }
 
-      // Autocrear categoría si no existe (no aplica a transferencias)
+      // Sin categoría elegida: reutilizar una categoría genérica ("Otros ingresos" / "Otros gastos")
+      // en lugar de crear una categoría nueva por cada transacción.
       if (type !== 'transfer' && !targetCategoryId && effectiveWorkspaceId) {
-        try {
-          const newCat = await createCategory({
-            workspaceId: effectiveWorkspaceId,
-            name: title || (type === 'income' ? 'Ingreso General' : 'Gasto General'),
-            type: type === 'income' ? 'INCOME' : 'EXPENSE',
-            categoryNature: 'ESSENTIAL',
-          });
-          targetCategoryId = newCat.id;
-        } catch (catErr) {
-          console.error('Error al autocrear categoría para transacción:', catErr);
+        const genericName = type === 'income' ? 'Otros Ingresos' : 'Otros Gastos';
+        const existingGeneric = (categoriesData || []).find(
+          (c) => c.name?.trim().toLowerCase() === genericName.toLowerCase()
+        );
+        if (existingGeneric) {
+          targetCategoryId = existingGeneric.id;
+        } else {
+          try {
+            const newCat = await createCategory({
+              workspaceId: effectiveWorkspaceId,
+              name: genericName,
+              type: type === 'income' ? 'INCOME' : 'EXPENSE',
+              categoryNature: 'NON_ESSENTIAL',
+            });
+            targetCategoryId = newCat.id;
+          } catch (catErr) {
+            console.error('Error al crear la categoría genérica:', catErr);
+          }
         }
       }
 
       if (effectiveWorkspaceId && targetAccountId) {
-        // Si el gasto es compartido, sincronizar la regla de división seleccionada en el modal
-        let activeSplitRuleId: string | undefined = undefined;
-        if (type !== 'transfer' && isSplit && coupleWs?.id) {
-          const ruleType: 'CUSTOM_PERCENTAGE' | 'EQUAL' = splitMode === 'PERCENTAGE' ? 'CUSTOM_PERCENTAGE' : 'EQUAL';
-          const partnerAPct = splitMode === 'PERCENTAGE' ? Number(userPercentage) : 50;
-          const partnerBPct = splitMode === 'PERCENTAGE' ? Number((100 - userPercentage).toFixed(2)) : 50;
-
-          try {
-            if (splitRules && splitRules.length > 0) {
-              const targetRule = splitRules[0];
-              await updateSplitRuleMut({
-                id: targetRule.id,
-                payload: {
-                  partnerAPercentage: partnerAPct,
-                  partnerBPercentage: partnerBPct,
-                  splitType: ruleType,
-                  isDefault: true,
-                },
-              });
-              activeSplitRuleId = targetRule.id;
-            } else {
-              const newRule = await createSplitRuleMut({
-                workspaceId: coupleWs.id,
-                name: splitMode === 'PERCENTAGE' ? `Porcentual (${partnerAPct}/${partnerBPct})` : 'Equitativo 50/50',
-                splitType: ruleType,
-                partnerAPercentage: partnerAPct,
-                partnerBPercentage: partnerBPct,
-                isDefault: true,
-              });
-              activeSplitRuleId = newRule.id;
-            }
-          } catch (ruleErr) {
-            console.error('Error al sincronizar regla de división:', ruleErr);
-          }
+        // Share of the shared expense assumed by partner A (workspace owner), computed with the same
+        // logic as the preview. It is stored on the transaction itself, so the workspace split rule
+        // is no longer overwritten and past expenses keep their split.
+        let splitPartnerAPercentage: number | undefined = undefined;
+        if (type !== 'transfer' && isSplit && coupleWs?.id && effectiveWorkspaceId === coupleWs.id) {
+          const myPct = computeSplit().myPct;
+          splitPartnerAPercentage = Number((isCoupleOwner ? myPct : 100 - myPct).toFixed(2));
         }
 
         // Parse date input with current time or noon to prevent timezone day shift
@@ -278,6 +282,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
               type: txType,
               description: title || defaultDesc,
               transactionDate: selectedDateTime,
+              ...(splitTouched && splitPartnerAPercentage !== undefined ? { splitPartnerAPercentage } : {}),
             },
           });
         } else {
@@ -302,7 +307,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
             originalAmount: isCross ? parseFloat(amount) : undefined,
             originalCurrency: isCross ? currentCurrency : undefined,
             transactionDate: selectedDateTime,
-            splitRuleId: activeSplitRuleId,
+            splitPartnerAPercentage,
           });
         }
       }
@@ -347,32 +352,24 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
     ? (customConvertedTargetAmount !== null ? customConvertedTargetAmount : convert(parsedAmount, currentCurrency, targetCurrency))
     : parsedAmount;
 
-  // Calculador dinámico según la regla seleccionada
-  const calculateSplitPreview = () => {
-    if (!parsedAmount || !isSplit) return null;
-    const targetName = partnerName || 'Pareja';
-
-    if (splitMode === 'EQUALLY') {
-      const half = parsedAmount / 2;
-      return `Tú: ${currencySymbol} ${half.toFixed(2)} | ${targetName}: ${currencySymbol} ${half.toFixed(2)} (50% / 50%)`;
-    }
-
+  // Porcentaje que asume el usuario actual según el modo de reparto elegido.
+  // Se usa tanto para la vista previa como para el valor que se guarda en la transacción.
+  function computeSplit(): { myPct: number; labelDetail?: string } {
     if (splitMode === 'PERCENTAGE') {
-      const myShare = (parsedAmount * userPercentage) / 100;
-      const partnerShare = parsedAmount - myShare;
-      return `Tú: ${currencySymbol} ${myShare.toFixed(2)} (${userPercentage}%) | ${targetName}: ${currencySymbol} ${partnerShare.toFixed(2)} (${100 - userPercentage}%)`;
+      return { myPct: userPercentage };
     }
 
     if (splitMode === 'PROPORTIONAL_INCOME') {
       let myInc = userMonthlyIncome;
       let partnerInc = partnerMonthlyIncome;
 
-      // Si el store local aún no los tiene (ej. en la ventana de la pareja), obtener de la regla guardada en la base de datos
+      // Si el store local aún no los tiene (ej. en la ventana de la pareja), obtener de la regla guardada.
+      // En la regla, A es siempre el dueño del espacio de pareja y B la pareja.
       if (myInc <= 0 && partnerInc <= 0 && splitRules.length > 0) {
         const defaultRule = splitRules.find((r) => r.isDefault || r.splitType === 'PROPORTIONAL') || splitRules[0];
         if (defaultRule && ((defaultRule.partnerAIncome ?? 0) > 0 || (defaultRule.partnerBIncome ?? 0) > 0)) {
-          myInc = defaultRule.partnerAIncome ?? 0;
-          partnerInc = defaultRule.partnerBIncome ?? 0;
+          myInc = (isCoupleOwner ? defaultRule.partnerAIncome : defaultRule.partnerBIncome) ?? 0;
+          partnerInc = (isCoupleOwner ? defaultRule.partnerBIncome : defaultRule.partnerAIncome) ?? 0;
         }
       }
 
@@ -391,28 +388,47 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
       }
 
       const totalIncome = myInc + partnerInc;
-      let myPct = 50;
-      let partnerPct = 50;
-      let labelDetail = 'Equitativo 50/50 (Sin ingresos registrados aún)';
-
-      if (totalIncome > 0) {
-        myPct = parseFloat(((myInc / totalIncome) * 100).toFixed(1));
-        partnerPct = parseFloat((100 - myPct).toFixed(1));
-        labelDetail = `Basado en Ingresos (${myInc} vs ${partnerInc}): ${myPct}% / ${partnerPct}%`;
+      if (totalIncome <= 0) {
+        return { myPct: 50, labelDetail: 'Equitativo 50/50 (Sin ingresos registrados aún)' };
       }
-
-      const myShare = (parsedAmount * myPct) / 100;
-      const partnerShare = parsedAmount - myShare;
-      return `Tú: ${currencySymbol} ${myShare.toFixed(2)} (${myPct}%) | ${targetName}: ${currencySymbol} ${partnerShare.toFixed(2)} (${partnerPct}%) [${labelDetail}]`;
+      const myPct = parseFloat(((myInc / totalIncome) * 100).toFixed(1));
+      return {
+        myPct,
+        labelDetail: `Basado en Ingresos (${myInc} vs ${partnerInc}): ${myPct}% / ${parseFloat((100 - myPct).toFixed(1))}%`,
+      };
     }
 
     if (splitMode === 'FIXED_AMOUNT') {
-      const partnerFixed = parseFloat(fixedPartnerAmount) || 0;
+      const partnerFixed = Math.min(parseFloat(fixedPartnerAmount) || 0, parsedAmount);
+      const myPct = parsedAmount > 0 ? ((parsedAmount - partnerFixed) / parsedAmount) * 100 : 50;
+      return { myPct: Math.max(0, Math.min(100, myPct)) };
+    }
+
+    return { myPct: 50 }; // EQUALLY
+  }
+
+  // Calculador dinámico según la regla seleccionada
+  const calculateSplitPreview = () => {
+    if (!parsedAmount || !isSplit) return null;
+    const targetName = partnerName || 'Pareja';
+    const { myPct, labelDetail } = computeSplit();
+
+    if (splitMode === 'EQUALLY') {
+      const half = parsedAmount / 2;
+      return `Tú: ${currencySymbol} ${half.toFixed(2)} | ${targetName}: ${currencySymbol} ${half.toFixed(2)} (50% / 50%)`;
+    }
+
+    if (splitMode === 'FIXED_AMOUNT') {
+      const partnerFixed = Math.min(parseFloat(fixedPartnerAmount) || 0, parsedAmount);
       const myShare = Math.max(0, parsedAmount - partnerFixed);
       return `Tú: ${currencySymbol} ${myShare.toFixed(2)} | ${targetName} paga fijo: ${currencySymbol} ${partnerFixed.toFixed(2)}`;
     }
 
-    return null;
+    const myShare = (parsedAmount * myPct) / 100;
+    const partnerShare = parsedAmount - myShare;
+    const partnerPct = parseFloat((100 - myPct).toFixed(1));
+    const base = `Tú: ${currencySymbol} ${myShare.toFixed(2)} (${myPct}%) | ${targetName}: ${currencySymbol} ${partnerShare.toFixed(2)} (${partnerPct}%)`;
+    return labelDetail ? `${base} [${labelDetail}]` : base;
   };
 
   return (
@@ -835,7 +851,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => setSplitMode('EQUALLY')}
+                      onClick={() => changeSplitMode('EQUALLY')}
                       className={`p-2.5 rounded-xl text-xs font-semibold text-left border transition-all ${splitMode === 'EQUALLY'
                         ? 'bg-indigo-600/20 border-indigo-500 text-white'
                         : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white'
@@ -847,7 +863,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
 
                     <button
                       type="button"
-                      onClick={() => setSplitMode('PROPORTIONAL_INCOME')}
+                      onClick={() => changeSplitMode('PROPORTIONAL_INCOME')}
                       className={`p-2.5 rounded-xl text-xs font-semibold text-left border transition-all ${splitMode === 'PROPORTIONAL_INCOME'
                         ? 'bg-indigo-600/20 border-indigo-500 text-white'
                         : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white'
@@ -859,7 +875,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
 
                     <button
                       type="button"
-                      onClick={() => setSplitMode('PERCENTAGE')}
+                      onClick={() => changeSplitMode('PERCENTAGE')}
                       className={`p-2.5 rounded-xl text-xs font-semibold text-left border transition-all ${splitMode === 'PERCENTAGE'
                         ? 'bg-indigo-600/20 border-indigo-500 text-white'
                         : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white'
@@ -871,7 +887,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
 
                     <button
                       type="button"
-                      onClick={() => setSplitMode('FIXED_AMOUNT')}
+                      onClick={() => changeSplitMode('FIXED_AMOUNT')}
                       className={`p-2.5 rounded-xl text-xs font-semibold text-left border transition-all ${splitMode === 'FIXED_AMOUNT'
                         ? 'bg-indigo-600/20 border-indigo-500 text-white'
                         : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:text-white'
@@ -895,7 +911,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
                         max="95"
                         step="5"
                         value={userPercentage}
-                        onChange={(e) => setUserPercentage(parseInt(e.target.value))}
+                        onChange={(e) => changeUserPercentage(parseInt(e.target.value))}
                         className="w-full accent-indigo-500 cursor-pointer"
                       />
                     </div>
@@ -910,7 +926,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
                       <input
                         type="number"
                         value={fixedPartnerAmount}
-                        onChange={(e) => setFixedPartnerAmount(e.target.value)}
+                        onChange={(e) => changeFixedPartnerAmount(e.target.value)}
                         placeholder="Ej. 30.00"
                         className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-xs text-white placeholder-gray-500 outline-none focus:border-indigo-500"
                       />
