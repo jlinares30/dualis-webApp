@@ -44,7 +44,7 @@ export function useWorkspaces() {
         }
       }
 
-      setWorkspaces(data);
+      setWorkspaces(data, user?.email);
       return data;
     },
     enabled: true,

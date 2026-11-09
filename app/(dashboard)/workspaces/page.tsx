@@ -78,7 +78,7 @@ export default function WorkspacesPage() {
 
           if (joined?.id) {
             setActiveWorkspace(joined.id, 'COUPLE');
-            linkPartner('Pareja', cleanCode);
+            linkPartner();
             setJoinSuccess('¡Te has unido exitosamente al Espacio Compartido de tu pareja!');
             setJoinCode('');
           } else {

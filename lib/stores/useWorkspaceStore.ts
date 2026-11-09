@@ -35,8 +35,14 @@ interface WorkspaceState {
   workspaces: WorkspaceDTO[];
   setActiveWorkspace: (id: string, type?: 'INDIVIDUAL' | 'COUPLE' | 'personal' | 'couple') => void;
   switchWorkspaceType: (type: 'personal' | 'couple' | 'INDIVIDUAL' | 'COUPLE' | string) => void;
-  setWorkspaces: (workspaces: WorkspaceDTO[]) => void;
-  linkPartner: (name: string, email: string, defaultRule?: DefaultSplitRule) => void;
+  /**
+   * Stores the workspaces returned by the server. When the current user's email is given, the couple
+   * link (hasPartner / partnerName / partnerEmail) is derived from the couple workspace members, so it is
+   * the same on every device and updates as soon as the partner joins or leaves.
+   */
+  setWorkspaces: (workspaces: WorkspaceDTO[], currentUserEmail?: string | null) => void;
+  /** Activates the couple workspace after creating/joining it. Partner details come from the server. */
+  linkPartner: (defaultRule?: DefaultSplitRule) => void;
   unlinkPartner: (snapshot?: ClosedWorkspaceSnapshot) => void;
   clearClosedSnapshot: () => void;
   setDefaultSplitRule: (rule: DefaultSplitRule, percentage?: number) => void;
@@ -77,10 +83,37 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             activeWorkspaceId: targetWs ? targetWs.id : state.activeWorkspaceId,
           };
         }),
-      setWorkspaces: (workspaces: WorkspaceDTO[]) =>
+      setWorkspaces: (workspaces: WorkspaceDTO[], currentUserEmail?: string | null) =>
         set((state: WorkspaceState) => {
           const personalWs = workspaces.find((w) => w.type === 'INDIVIDUAL' || (w.type as any) === 'personal');
           const coupleWs = workspaces.find((w) => w.type === 'COUPLE' || (w.type as any) === 'couple');
+
+          // Authenticated user: the partner link comes from the server, not from local state.
+          const me = currentUserEmail?.trim().toLowerCase();
+          if (me) {
+            const partner = coupleWs?.members?.find((m) => m.userEmail && m.userEmail.toLowerCase() !== me);
+            if (!coupleWs || !partner) {
+              return {
+                workspaces,
+                hasPartner: false,
+                partnerName: null,
+                partnerEmail: null,
+                activeWorkspaceId: personalWs ? personalWs.id : (workspaces[0]?.id || null),
+                activeWorkspaceType: 'personal',
+              };
+            }
+            const activeExists = workspaces.some((w) => w.id === state.activeWorkspaceId);
+            return {
+              workspaces,
+              hasPartner: true,
+              partnerName: partner.fullName || partner.userName || partner.userEmail.split('@')[0],
+              partnerEmail: partner.userEmail,
+              activeWorkspaceId: activeExists ? state.activeWorkspaceId : (personalWs?.id || workspaces[0]?.id || null),
+              activeWorkspaceType: activeExists ? state.activeWorkspaceType : 'personal',
+            };
+          }
+
+          // Demo / guest mode keeps the previous local behaviour.
           
           // Si el servidor ya no devuelve ningún espacio de pareja (porque la pareja lo desvinculó o eliminó):
           const serverHasCouple = Boolean(coupleWs);
@@ -120,13 +153,10 @@ export const useWorkspaceStore = create<WorkspaceState>()(
             w.id === workspaceId ? { ...w, currency } : w
           ),
         })),
-      linkPartner: (name: string, email: string, defaultRule: DefaultSplitRule = 'PROPORTIONAL_INCOME') =>
+      linkPartner: (defaultRule: DefaultSplitRule = 'PROPORTIONAL_INCOME') =>
         set((state: WorkspaceState) => {
           const coupleWs = state.workspaces.find((w) => w.type === 'COUPLE' || (w.type as any) === 'couple');
           return {
-            hasPartner: true,
-            partnerName: name,
-            partnerEmail: email,
             defaultSplitRule: defaultRule,
             activeWorkspaceType: coupleWs ? 'couple' : state.activeWorkspaceType,
             activeWorkspaceId: coupleWs ? coupleWs.id : state.activeWorkspaceId,

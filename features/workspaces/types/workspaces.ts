@@ -20,6 +20,8 @@ export interface WorkspaceMemberDTO {
   role: 'OWNER' | 'PARTNER' | 'MEMBER';
   joinedAt?: string;
   userName?: string;
+  /** Display name provided by the backend */
+  fullName?: string | null;
   userId?: string;
 }
 

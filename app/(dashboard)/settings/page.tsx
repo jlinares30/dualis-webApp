@@ -92,8 +92,11 @@ export default function SettingsPage() {
 
   // Resolver el nombre real de la pareja desde los miembros del espacio si en el store dice 'pareja'
   const coupleWs = workspaces.find((w) => w.type === 'COUPLE' || (w.type as any) === 'couple');
-  const partnerMember = coupleWs?.members?.find((m) => m.userEmail !== user?.email && m.userId !== user?.id);
+  const partnerMember = coupleWs?.members?.find(
+    (m) => m.userEmail?.toLowerCase() !== user?.email?.toLowerCase() && m.userId !== user?.id
+  );
   const rawPartnerName =
+    partnerMember?.fullName ||
     partnerMember?.userName ||
     (partnerMember?.userEmail ? partnerMember.userEmail.split('@')[0] : null) ||
     (partnerName && partnerName.toLowerCase() !== 'pareja' && partnerName.toLowerCase() !== 'tu pareja' ? partnerName : null) ||
@@ -183,7 +186,7 @@ export default function SettingsPage() {
         if (created?.id) {
           setActiveWorkspace(created.id, 'COUPLE');
           const codeToLink = created.invitationCode || created.inviteCode || 'Código Generado';
-          linkPartner(partnerInputName || 'Pareja', codeToLink, selectedRule);
+          linkPartner(selectedRule);
           queryClient.invalidateQueries({ queryKey: ['workspaces'] });
           queryClient.invalidateQueries({ queryKey: ['inviteCode'] });
           setJoinSuccess(`¡Espacio de Pareja creado con éxito! Tu código es: ${codeToLink}`);
@@ -215,11 +218,11 @@ export default function SettingsPage() {
 
         if (joined?.id) {
           setActiveWorkspace(joined.id, 'COUPLE');
-          linkPartner(partnerInputName || 'Pareja', inviteCodeInput.trim(), selectedRule);
+          linkPartner(selectedRule);
+          queryClient.invalidateQueries({ queryKey: ['workspaces'] });
           setJoinSuccess('¡Te has vinculado exitosamente al Espacio Compartido de tu pareja!');
         } else {
-          linkPartner(partnerInputName || 'Pareja', inviteCodeInput.trim(), selectedRule);
-          setJoinSuccess('Vinculado en modo local.');
+          setJoinError('No se pudo confirmar la vinculación con el servidor. Inténtalo nuevamente.');
         }
       } catch (err: any) {
         console.error('Error al unirse al espacio mediante código:', err);
