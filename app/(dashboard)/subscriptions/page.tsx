@@ -269,6 +269,8 @@ export default function SubscriptionsPage() {
   // Opciones de Privacidad
   const [hideIncomeFromPartner, setHideIncomeFromPartner] = useState(false);
   const [partnerHidesFromMe, setPartnerHidesFromMe] = useState(false);
+  // Porcentaje que me corresponde según la regla guardada (disponible aunque la pareja oculte su sueldo)
+  const [myRulePercentage, setMyRulePercentage] = useState<number | null>(null);
   const [showPartnerIncome, setShowPartnerIncome] = useState(false);
 
   // Detección de Abono Programado Pendiente: Si hoy es el día de pago o posterior y no se ha ejecutado este mes
@@ -437,54 +439,43 @@ export default function SubscriptionsPage() {
   };
 
   // Determinar si el usuario actual es el OWNER (Partner A) o el PARTNER (Partner B) del workspace
-  const isOwner = Boolean(
-    activeWs?.members?.some((m) => m.role === 'OWNER' && (m.userEmail === user?.email || m.userId === user?.id)) ||
-    activeWs?.members?.length === 0 ||
-    !activeWs?.members ||
-    (activeWs?.members?.[0]?.userEmail === user?.email)
-  );
+  // En las reglas de reparto, el socio A es siempre el dueño del espacio de pareja.
+  const myEmailLower = user?.email?.toLowerCase();
+  const ownerEmailLower = (
+    activeWs?.ownerEmail || activeWs?.members?.find((m) => m.role === 'OWNER')?.userEmail
+  )?.toLowerCase();
+  const isOwner = !ownerEmailLower || !myEmailLower || ownerEmailLower === myEmailLower;
 
   // Obtener el nombre de la pareja de los miembros del espacio compartido
-  const partnerMember = activeWs?.members?.find((m) => m.userEmail !== user?.email && m.userId !== user?.id);
+  const partnerMember = activeWs?.members?.find(
+    (m) => m.userEmail?.toLowerCase() !== myEmailLower && m.userId !== user?.id
+  );
   const rawPartnerName =
+    partnerMember?.fullName ||
     partnerMember?.userName ||
     (partnerMember?.userEmail ? partnerMember.userEmail.split('@')[0] : null) ||
     (partnerName && partnerName.toLowerCase() !== 'pareja' && partnerName.toLowerCase() !== 'tu pareja' ? partnerName : null) ||
     'tu pareja';
   const displayPartnerName = capitalize(rawPartnerName);
 
-  // Helper para parsear banderas de privacidad de forma robusta
-  const parsePrivacyFlags = (ruleName?: string) => {
-    if (!ruleName) return { hideA: null, hideB: null };
-    const mA = ruleName.match(/hideA\s*:\s*(true|false)/i);
-    const mB = ruleName.match(/hideB\s*:\s*(true|false)/i);
-    return {
-      hideA: mA ? mA[1].toLowerCase() === 'true' : null,
-      hideB: mB ? mB[1].toLowerCase() === 'true' : null,
-    };
-  };
-
   // Cargar regla y banderas de privacidad sincronizadas desde el backend
   useEffect(() => {
     if (splitRules && splitRules.length > 0) {
       const defaultRule = splitRules.find((r) => r.isDefault || r.splitType === 'PROPORTIONAL') || splitRules[0];
       if (defaultRule) {
-        const incomeA = defaultRule.partnerAIncome ?? 0;
-        const incomeB = defaultRule.partnerBIncome ?? 0;
-
-        const { hideA, hideB } = parsePrivacyFlags(defaultRule.name);
-
-        const myHide = (isOwner ? hideA : hideB) ?? false;
-        const partnerHide = (isOwner ? hideB : hideA) ?? false;
+        const myIncome = (isOwner ? defaultRule.partnerAIncome : defaultRule.partnerBIncome) ?? 0;
+        // null cuando la pareja mantiene su sueldo en privado: el backend no lo envía
+        const partnerIncomeRaw = isOwner ? defaultRule.partnerBIncome : defaultRule.partnerAIncome;
+        const myHide = Boolean(isOwner ? defaultRule.partnerAIncomeHidden : defaultRule.partnerBIncomeHidden);
+        const partnerHide = Boolean(isOwner ? defaultRule.partnerBIncomeHidden : defaultRule.partnerAIncomeHidden);
+        const myPct = isOwner ? defaultRule.partnerAPercentage : defaultRule.partnerBPercentage;
 
         setPartnerHidesFromMe(partnerHide);
-
-        const myIncome = isOwner ? incomeA : incomeB;
-        const partnerIncome = isOwner ? incomeB : incomeA;
+        setMyRulePercentage(typeof myPct === 'number' ? myPct : null);
 
         // El sueldo de la pareja SIEMPRE se actualiza en tiempo real cuando la pareja lo cambia
-        setPartnerIncomeInput(String(partnerIncome));
-        setMonthlyIncomes(myIncome, partnerIncome);
+        setPartnerIncomeInput(partnerIncomeRaw != null ? String(partnerIncomeRaw) : '');
+        setMonthlyIncomes(myIncome, partnerIncomeRaw ?? 0);
 
         // Mi sueldo y mi bandera de privacidad solo se inicializan al cargar por primera vez
         // para no sobreescribir lo que el usuario esté escribiendo en ese momento
@@ -507,44 +498,24 @@ export default function SubscriptionsPage() {
     e.preventDefault();
     requireAuth(async () => {
       const myInc = parseFloat(myIncomeInput) || 0;
-      const partnerInc = parseFloat(partnerIncomeInput) || 0;
-      setMonthlyIncomes(myInc, partnerInc);
+      setMonthlyIncomes(myInc, parseFloat(partnerIncomeInput) || 0);
       setIsSavingIncome(true);
 
       if (activeWorkspaceId) {
         try {
-        // Asignar correctamente A y B según quién está guardando
-        const partnerAIncome = isOwner ? myInc : partnerInc;
-        const partnerBIncome = isOwner ? partnerInc : myInc;
-
-        const total = partnerAIncome + partnerBIncome;
-        const aPct = total > 0 ? Math.round((partnerAIncome / total) * 100) : 50;
-        const bPct = 100 - aPct;
+        // Cada miembro guarda solo su propio sueldo y su preferencia de privacidad; el backend
+        // recalcula la proporción con el sueldo guardado de la pareja (aunque esté oculto).
+        const ownIncomeFields = isOwner
+          ? { partnerAIncome: myInc, partnerAIncomeHidden: hideIncomeFromPartner }
+          : { partnerBIncome: myInc, partnerBIncomeHidden: hideIncomeFromPartner };
 
         const existingRule = splitRules.find((r) => r.isDefault || r.splitType === 'PROPORTIONAL') || splitRules[0];
-
-        // Preservar la privacidad del otro y actualizar la mía
-        const parsedExisting = parsePrivacyFlags(existingRule?.name);
-        const prevHideA = parsedExisting.hideA ?? false;
-        const prevHideB = parsedExisting.hideB ?? false;
-
-        const newHideA = isOwner ? hideIncomeFromPartner : prevHideA;
-        const newHideB = !isOwner ? hideIncomeFromPartner : prevHideB;
-
-        // Limpiar flags antiguos para no duplicar corchetes en el nombre
-        const rawName = existingRule?.name || 'Repartición Proporcional';
-        const cleanBaseName = rawName.replace(/\[\s*hideA\s*:[^,]+,\s*hideB\s*:[^\]]+\]/gi, '').trim() || 'Repartición Proporcional';
-        const syncRuleName = `${cleanBaseName} [hideA:${newHideA},hideB:${newHideB}]`;
 
         if (existingRule?.id) {
           await updateSplitRuleMut({
             id: existingRule.id,
             payload: {
-              name: syncRuleName,
-              partnerAIncome,
-              partnerBIncome,
-              partnerAPercentage: aPct,
-              partnerBPercentage: bPct,
+              ...ownIncomeFields,
               splitType: 'PROPORTIONAL',
               isDefault: true,
             },
@@ -552,12 +523,9 @@ export default function SubscriptionsPage() {
         } else {
           await createSplitRuleMut({
             workspaceId: activeWorkspaceId,
-            name: syncRuleName,
+            name: 'Repartición Proporcional',
             splitType: 'PROPORTIONAL',
-            partnerAIncome,
-            partnerBIncome,
-            partnerAPercentage: aPct,
-            partnerBPercentage: bPct,
+            ...ownIncomeFields,
             isDefault: true,
           });
         }
@@ -872,9 +840,12 @@ export default function SubscriptionsPage() {
                 const u = parseFloat(myIncomeInput) || 0;
                 const p = parseFloat(partnerIncomeInput) || 0;
                 const tot = u + p;
-                if (tot > 0) {
-                  const uPct = ((u / tot) * 100).toFixed(1);
-                  const pPct = ((p / tot) * 100).toFixed(1);
+                // Con el sueldo de la pareja oculto, la proporción viene de la regla guardada en el servidor.
+                const pctFromRule = myRulePercentage !== null && (partnerHidesFromMe || tot <= 0);
+                if (pctFromRule || tot > 0) {
+                  const uPctNum = pctFromRule ? (myRulePercentage as number) : (u / tot) * 100;
+                  const uPct = uPctNum.toFixed(1);
+                  const pPct = (100 - uPctNum).toFixed(1);
                   return (
                     <div className="w-full sm:w-72 space-y-1.5">
                       <div className="flex items-center justify-between text-xs font-bold">
@@ -965,12 +936,12 @@ export default function SubscriptionsPage() {
                     type="text"
                     readOnly
                     disabled
-                    placeholder="Sin registrar aún por pareja"
+                    placeholder={partnerHidesFromMe ? 'Monto privado (Confidencial)' : 'Sin registrar aún por pareja'}
                     value={
-                      !partnerIncomeInput
-                        ? ''
-                        : partnerHidesFromMe
+                      partnerHidesFromMe
                         ? '•••••••••••• (Confidencial)'
+                        : !partnerIncomeInput
+                        ? ''
                         : showPartnerIncome
                         ? `${currency} ${parseFloat(partnerIncomeInput).toLocaleString('es-PE', { minimumFractionDigits: 2 })}`
                         : '••••••••'

@@ -360,6 +360,16 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
     }
 
     if (splitMode === 'PROPORTIONAL_INCOME') {
+      // La proporción calculada por el servidor está disponible aunque la pareja oculte su sueldo.
+      const proportionalRule = splitRules.find((r) => r.splitType === 'PROPORTIONAL' && r.isDefault)
+        || splitRules.find((r) => r.splitType === 'PROPORTIONAL');
+      const rulePct = proportionalRule
+        ? (isCoupleOwner ? proportionalRule.partnerAPercentage : proportionalRule.partnerBPercentage)
+        : undefined;
+      if (typeof rulePct === 'number') {
+        return { myPct: rulePct, labelDetail: `Según la proporción de ingresos registrada: ${rulePct}% / ${parseFloat((100 - rulePct).toFixed(1))}%` };
+      }
+
       let myInc = userMonthlyIncome;
       let partnerInc = partnerMonthlyIncome;
 

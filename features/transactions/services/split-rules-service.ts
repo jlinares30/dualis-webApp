@@ -9,8 +9,12 @@ export interface SplitRuleDTO {
   splitType: SplitType;
   partnerAPercentage?: number;
   partnerBPercentage?: number;
-  partnerAIncome?: number;
-  partnerBIncome?: number;
+  /** null when partner A keeps it private and the viewer is partner B */
+  partnerAIncome?: number | null;
+  /** null when partner B keeps it private and the viewer is partner A */
+  partnerBIncome?: number | null;
+  partnerAIncomeHidden?: boolean;
+  partnerBIncomeHidden?: boolean;
   partnerAFixedAmount?: number;
   isDefault?: boolean;
   createdAt?: string;
@@ -23,8 +27,12 @@ export interface CreateSplitRulePayload {
   splitType: SplitType;
   partnerAPercentage?: number;
   partnerBPercentage?: number;
+  /** Only applied when sent by partner A (workspace owner) */
   partnerAIncome?: number;
+  /** Only applied when sent by partner B */
   partnerBIncome?: number;
+  partnerAIncomeHidden?: boolean;
+  partnerBIncomeHidden?: boolean;
   partnerAFixedAmount?: number;
   isDefault?: boolean;
 }
