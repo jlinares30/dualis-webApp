@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransactionsInWorkspaceCurrency } from '@/hooks/useTransactionsInWorkspaceCurrency';
 import React from 'react';
 import {
   ResponsiveContainer,
@@ -47,12 +48,13 @@ export function CategoryDistributionChart({ period }: CategoryDistributionChartP
   const { data: pageData, isLoading: isLoadingTx } = useTransactions(0, 200);
   const { data: categories = [], isLoading: isLoadingCat } = useCategories('EXPENSE');
 
+  const toWorkspaceCurrency = useTransactionsInWorkspaceCurrency();
   const { chartData, totalExpenses } = React.useMemo(() => {
     if (!pageData?.content || pageData.content.length === 0) {
       return { chartData: [], totalExpenses: 0 };
     }
 
-    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
+    const filteredTx = toWorkspaceCurrency(filterTransactionsByPeriod(pageData.content, period));
     const catMap: Record<string, { name: string; value: number }> = {};
     let grandTotal = 0;
 
@@ -81,7 +83,7 @@ export function CategoryDistributionChart({ period }: CategoryDistributionChartP
       chartData: formattedData,
       totalExpenses: grandTotal,
     };
-  }, [pageData]);
+  }, [pageData, period, toWorkspaceCurrency]);
 
   const isLoading = isLoadingTx || isLoadingCat;
   const hasData = chartData.length > 0;

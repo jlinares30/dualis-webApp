@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransactionsInWorkspaceCurrency } from '@/hooks/useTransactionsInWorkspaceCurrency';
 import React from 'react';
 import { Wallet, TrendingDown, Users, ArrowUpRight } from 'lucide-react';
 import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
@@ -24,7 +25,16 @@ export function SummaryCards({ workspace, period }: SummaryCardsProps) {
   const convert = useExchangeRateStore((s) => s.convert);
   const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
 
-  const { data: summaryData, isLoading: isLoadingSummary } = useDashboardSummary();
+  // "Este mes" y "Mes anterior" vienen del backend: montos convertidos a la moneda del espacio, mes en hora local
+  // y, en el espacio personal, gastos compartidos pagados con cuentas personales.
+  const backendPeriod = React.useMemo(() => {
+    if (period !== 'THIS_MONTH' && period !== 'LAST_MONTH') return undefined;
+    const now = new Date();
+    const d = period === 'LAST_MONTH' ? new Date(now.getFullYear(), now.getMonth() - 1, 1) : now;
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  }, [period]);
+  const { data: summaryData, isLoading: isLoadingSummary } = useDashboardSummary(backendPeriod);
+  const toWorkspaceCurrency = useTransactionsInWorkspaceCurrency();
   const { data: txPage, isLoading: isLoadingTx } = useTransactions(0, 200);
   const { data: accountsList, isLoading: isLoadingAccounts } = useAccounts();
 
@@ -45,10 +55,15 @@ export function SummaryCards({ workspace, period }: SummaryCardsProps) {
     }));
   }, [accountsList, currency]);
 
-  // Total convertido a la moneda base del espacio
+  // Total convertido a la moneda base del espacio (el backend respeta "incluir en el total")
+  const backendTotalBalance = summaryData?.totalBalance;
+  const backendTotalLiquidity = summaryData?.totalLiquidity;
   const convertedTotalBalance = React.useMemo(() => {
+    if (typeof backendTotalBalance === 'number') {
+      return backendTotalBalance;
+    }
     if (!accountsList || accountsList.length === 0) {
-      return summaryData?.totalBalance ?? summaryData?.totalLiquidity ?? 0;
+      return backendTotalLiquidity ?? 0;
     }
     return accountsList.reduce((acc, account) => {
       const accCurr = (account.currency && account.currency.trim() ? account.currency : currency).toUpperCase();
@@ -58,9 +73,17 @@ export function SummaryCards({ workspace, period }: SummaryCardsProps) {
       }
       return acc + convert(account.balance || 0, accCurr, currency);
     }, 0);
-  }, [accountsList, summaryData?.totalBalance, summaryData?.totalLiquidity, currency, convert]);
+  }, [accountsList, backendTotalBalance, backendTotalLiquidity, currency, convert]);
 
   const { monthlyIncome, monthlyExpenses, netSavings, savingsRate } = React.useMemo(() => {
+    if (backendPeriod && summaryData) {
+      return {
+        monthlyIncome: summaryData.monthlyIncome || 0,
+        monthlyExpenses: summaryData.monthlyExpenses || 0,
+        netSavings: summaryData.netSavings || 0,
+        savingsRate: summaryData.savingsRatePercentage || 0,
+      };
+    }
     if (!txPage?.content || txPage.content.length === 0) {
       return {
         monthlyIncome: summaryData?.monthlyIncome || 0,
@@ -70,7 +93,7 @@ export function SummaryCards({ workspace, period }: SummaryCardsProps) {
       };
     }
 
-    const filtered = filterTransactionsByPeriod(txPage.content, period);
+    const filtered = toWorkspaceCurrency(filterTransactionsByPeriod(txPage.content, period));
     let inc = 0;
     let exp = 0;
 
@@ -88,7 +111,7 @@ export function SummaryCards({ workspace, period }: SummaryCardsProps) {
       netSavings: net,
       savingsRate: rate,
     };
-  }, [txPage, summaryData, period]);
+  }, [txPage, summaryData, period, backendPeriod, toWorkspaceCurrency]);
 
   const exceededCount = summaryData?.exceededBudgetsCount ?? 0;
   const isLoading = isLoadingSummary || isLoadingTx || isLoadingAccounts;

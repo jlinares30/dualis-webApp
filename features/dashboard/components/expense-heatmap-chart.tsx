@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransactionsInWorkspaceCurrency } from '@/hooks/useTransactionsInWorkspaceCurrency';
 import React from 'react';
 import {
   ResponsiveContainer,
@@ -31,6 +32,7 @@ export function ExpenseHeatmapChart({ period }: ExpenseHeatmapChartProps) {
   const currency = activeWs?.currency || 'PEN';
   const { data: pageData, isLoading } = useTransactions(0, 200);
 
+  const toWorkspaceCurrency = useTransactionsInWorkspaceCurrency();
   const { chartData, peakDay, peakAmount } = React.useMemo(() => {
     if (!pageData?.content || pageData.content.length === 0) {
       return {
@@ -40,7 +42,7 @@ export function ExpenseHeatmapChart({ period }: ExpenseHeatmapChartProps) {
       };
     }
 
-    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
+    const filteredTx = toWorkspaceCurrency(filterTransactionsByPeriod(pageData.content, period));
     const dayTotals = [0, 0, 0, 0, 0, 0, 0];
 
     filteredTx.forEach((tx) => {
@@ -71,7 +73,7 @@ export function ExpenseHeatmapChart({ period }: ExpenseHeatmapChartProps) {
       peakDay: DAYS_OF_WEEK[maxIdx],
       peakAmount: maxVal,
     };
-  }, [pageData]);
+  }, [pageData, period, toWorkspaceCurrency]);
 
   const hasData = peakAmount > 0;
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransactionsInWorkspaceCurrency } from '@/hooks/useTransactionsInWorkspaceCurrency';
 import React from 'react';
 import { formatCurrency, filterTransactionsByPeriod } from '@/lib/utils';
 import { ShieldCheck, ShieldAlert, Sparkles, ArrowUpRight, PiggyBank } from 'lucide-react';
@@ -15,6 +16,7 @@ export function SavingsRateGauge({ period }: SavingsRateGaugeProps) {
   const { data: summary, isLoading: isLoadingSummary } = useDashboardSummary();
   const { data: txPage, isLoading: isLoadingTx } = useTransactions(0, 200);
 
+  const toWorkspaceCurrency = useTransactionsInWorkspaceCurrency();
   const { totalIncome, totalExpenses, netSavings, savingsRate } = React.useMemo(() => {
     if (!txPage?.content || txPage.content.length === 0) {
       const inc = summary?.monthlyIncome || 0;
@@ -24,7 +26,7 @@ export function SavingsRateGauge({ period }: SavingsRateGaugeProps) {
       return { totalIncome: inc, totalExpenses: exp, netSavings: net, savingsRate: rate };
     }
 
-    const filtered = filterTransactionsByPeriod(txPage.content, period);
+    const filtered = toWorkspaceCurrency(filterTransactionsByPeriod(txPage.content, period));
     let inc = 0;
     let exp = 0;
 
@@ -37,7 +39,7 @@ export function SavingsRateGauge({ period }: SavingsRateGaugeProps) {
     const rate = inc > 0 ? Math.round((net / inc) * 100) : 0;
 
     return { totalIncome: inc, totalExpenses: exp, netSavings: net, savingsRate: rate };
-  }, [txPage, summary, period]);
+  }, [txPage, summary, period, toWorkspaceCurrency]);
 
   const isLoading = isLoadingSummary || isLoadingTx;
   const boundedRate = Math.max(0, Math.min(100, savingsRate));

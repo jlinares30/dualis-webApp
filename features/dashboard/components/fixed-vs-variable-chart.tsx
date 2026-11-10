@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransactionsInWorkspaceCurrency } from '@/hooks/useTransactionsInWorkspaceCurrency';
 import React from 'react';
 import {
   ResponsiveContainer,
@@ -25,12 +26,13 @@ export function FixedVsVariableChart({ period }: FixedVsVariableChartProps) {
   const currency = activeWs?.currency || 'PEN';
   const { data: pageData, isLoading } = useTransactions(0, 200);
 
+  const toWorkspaceCurrency = useTransactionsInWorkspaceCurrency();
   const { fixedAmount, variableAmount, totalExpenses, chartData } = React.useMemo(() => {
     if (!pageData?.content || pageData.content.length === 0) {
       return { fixedAmount: 0, variableAmount: 0, totalExpenses: 0, chartData: [] };
     }
 
-    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
+    const filteredTx = toWorkspaceCurrency(filterTransactionsByPeriod(pageData.content, period));
     let fixed = 0;
     let variable = 0;
 
@@ -60,7 +62,7 @@ export function FixedVsVariableChart({ period }: FixedVsVariableChartProps) {
         { name: 'Gastos Variables/Estilo de Vida', value: variable, color: '#f59e0b' },
       ],
     };
-  }, [pageData]);
+  }, [pageData, period, toWorkspaceCurrency]);
 
   const hasData = totalExpenses > 0;
   const fixedPct = totalExpenses > 0 ? Math.round((fixedAmount / totalExpenses) * 100) : 0;

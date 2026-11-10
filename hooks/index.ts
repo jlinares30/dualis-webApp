@@ -12,3 +12,4 @@ export * from '@/features/workspaces/hooks/useWorkspaces';
 export * from '@/features/dashboard/hooks/useDashboard';
 export * from '@/features/dashboard/hooks/useFinanceQuery';
 export * from './useGuestGate';
+export * from './useTransactionsInWorkspaceCurrency';

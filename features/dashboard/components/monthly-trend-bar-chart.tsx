@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransactionsInWorkspaceCurrency } from '@/hooks/useTransactionsInWorkspaceCurrency';
 import React from 'react';
 import {
   ResponsiveContainer,
@@ -28,12 +29,13 @@ export function MonthlyTrendBarChart({ period }: MonthlyTrendBarChartProps) {
   const currency = activeWs?.currency || 'PEN';
   const { data: pageData, isLoading } = useTransactions(0, 300);
 
+  const toWorkspaceCurrency = useTransactionsInWorkspaceCurrency();
   const { chartData } = React.useMemo(() => {
     if (!pageData?.content || pageData.content.length === 0) {
       return { chartData: [] };
     }
 
-    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
+    const filteredTx = toWorkspaceCurrency(filterTransactionsByPeriod(pageData.content, period));
     const monthMap: Record<string, { month: string; Ingresos: number; Gastos: number }> = {};
 
     filteredTx.forEach((tx) => {
@@ -53,7 +55,7 @@ export function MonthlyTrendBarChart({ period }: MonthlyTrendBarChartProps) {
     });
 
     return { chartData: Object.values(monthMap) };
-  }, [pageData]);
+  }, [pageData, period, toWorkspaceCurrency]);
 
   const hasData = chartData.length > 0;
 

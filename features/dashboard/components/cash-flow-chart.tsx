@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransactionsInWorkspaceCurrency } from '@/hooks/useTransactionsInWorkspaceCurrency';
 import React from 'react';
 import {
   ResponsiveContainer,
@@ -34,10 +35,11 @@ export function CashFlowChart({ period }: CashFlowChartProps) {
   const { data: pageData, isLoading } = useTransactions(0, 300);
 
   // Generar meses acumulados dinámicos desde transacciones reales
+  const toWorkspaceCurrency = useTransactionsInWorkspaceCurrency();
   const chartData = React.useMemo(() => {
     if (!pageData?.content || pageData.content.length === 0) return [];
     
-    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
+    const filteredTx = toWorkspaceCurrency(filterTransactionsByPeriod(pageData.content, period));
     const monthMap: Record<string, { month: string; ingresos: number; gastos: number }> = {};
     
     filteredTx.forEach((tx) => {
@@ -57,7 +59,7 @@ export function CashFlowChart({ period }: CashFlowChartProps) {
     });
 
     return Object.values(monthMap);
-  }, [pageData]);
+  }, [pageData, period, toWorkspaceCurrency]);
 
   const hasData = chartData.length > 0;
 

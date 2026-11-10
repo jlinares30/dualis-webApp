@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransactionsInWorkspaceCurrency } from '@/hooks/useTransactionsInWorkspaceCurrency';
 import React from 'react';
 import {
   ResponsiveContainer,
@@ -39,6 +40,7 @@ export function PartnerComparisonChart({ period }: PartnerComparisonChartProps) 
     'Tu Pareja';
   const partnerLabel = capitalize(rawPartnerName);
 
+  const toWorkspaceCurrency = useTransactionsInWorkspaceCurrency();
   const { chartData, myTotal, partnerTotal, settlementText } = React.useMemo(() => {
     if (!pageData?.content || pageData.content.length === 0) {
       return {
@@ -52,7 +54,7 @@ export function PartnerComparisonChart({ period }: PartnerComparisonChartProps) 
       };
     }
 
-    const filteredTx = filterTransactionsByPeriod(pageData.content, period);
+    const filteredTx = toWorkspaceCurrency(filterTransactionsByPeriod(pageData.content, period));
     let mine = 0;
     let partner = 0;
 
@@ -84,7 +86,7 @@ export function PartnerComparisonChart({ period }: PartnerComparisonChartProps) 
       partnerTotal: partner,
       settlementText: settlement,
     };
-  }, [pageData, myName, partnerLabel, user?.email]);
+  }, [pageData, myName, partnerLabel, user?.email, period, toWorkspaceCurrency]);
 
   const hasData = myTotal > 0 || partnerTotal > 0;
 

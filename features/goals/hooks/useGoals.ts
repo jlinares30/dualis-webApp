@@ -18,7 +18,8 @@ export function useGoals() {
       }
       return getGoals(activeWorkspaceId!);
     },
-    enabled: (!isAuthenticated) || Boolean(activeWorkspaceId),
+    // Wait for a real workspace id (the demo id is used before the user's workspaces load)
+    enabled: (!isAuthenticated) || Boolean(activeWorkspaceId && /^[0-9a-fA-F-]{36}$/.test(activeWorkspaceId)),
   });
 }
 

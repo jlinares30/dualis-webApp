@@ -11,9 +11,14 @@ interface DashboardDateFilterProps {
 }
 
 export function DashboardDateFilter({ selectedPeriod, onPeriodChange }: DashboardDateFilterProps) {
+  const now = new Date();
+  const monthLabel = (d: Date) => {
+    const text = d.toLocaleDateString('es-PE', { month: 'long', year: 'numeric' });
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  };
   const options: { id: DateFilterOption; label: string }[] = [
-    { id: 'THIS_MONTH', label: 'Este Mes (Agosto 2026)' },
-    { id: 'LAST_MONTH', label: 'Mes Anterior (Julio 2026)' },
+    { id: 'THIS_MONTH', label: `Este Mes (${monthLabel(now)})` },
+    { id: 'LAST_MONTH', label: `Mes Anterior (${monthLabel(new Date(now.getFullYear(), now.getMonth() - 1, 1))})` },
     { id: 'LAST_3_MONTHS', label: 'Últimos 3 Meses' },
     { id: 'ALL_TIME', label: 'Todo el Historial' },
   ];
