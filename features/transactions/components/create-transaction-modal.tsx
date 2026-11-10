@@ -4,7 +4,7 @@ import { useWorkspaceStore, DefaultSplitRule } from '@/lib/stores/useWorkspaceSt
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useExchangeRateStore } from '@/lib/stores/useExchangeRateStore';
 import { useCreateTransaction, useUpdateTransaction, useTransactions, useSplitRules } from '@/hooks';
-import { useAccounts, useCreateAccount } from '@/hooks';
+import { useAccounts } from '@/hooks';
 import { useCategories, useCreateCategory } from '@/hooks';
 import { Transaction } from '../types/transactions';
 import { CustomExchangeRateInput } from '@/components/ui/custom-exchange-rate-input';
@@ -111,7 +111,6 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
     isCoupleWorkspace && personalWs?.id ? personalWs.id : undefined
   );
 
-  const { mutateAsync: createAccount } = useCreateAccount();
   const { data: categoriesData } = useCategories(type === 'income' ? 'INCOME' : 'EXPENSE');
   const { mutateAsync: createCategory } = useCreateCategory();
   const { data: txPage } = useTransactions(0, 100);
@@ -176,7 +175,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
 
     setErrorMessage(null);
     try {
-      let targetAccountId = selectedAccountId;
+      const targetAccountId = selectedAccountId;
       let targetCategoryId = selectedCategoryId;
 
       if (type === 'transfer') {
@@ -215,20 +214,11 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
             ? coupleWs.id
             : activeWorkspaceId || personalWs?.id;
 
-      // Autocrear cuenta si no existe (solo si no es transferencia)
-      if (type !== 'transfer' && !targetAccountId && effectiveWorkspaceId) {
-        try {
-          const newAcc = await createAccount({
-            workspaceId: effectiveWorkspaceId,
-            name: 'Cuenta Principal',
-            type: 'BANK',
-            balance: 0,
-            currency: 'PEN',
-          });
-          targetAccountId = newAcc.id;
-        } catch (accErr) {
-          console.error('Error al autocrear cuenta para transacción:', accErr);
-        }
+      // Sin cuenta no se puede registrar el movimiento. Antes se creaba aquí una "Cuenta Principal" en PEN
+      // en una llamada aparte (y quedaba creada aunque luego fallara la transacción).
+      if (!targetAccountId) {
+        setErrorMessage('Selecciona una cuenta para registrar el movimiento. Si aún no tienes una, créala en la sección Cuentas.');
+        return;
       }
 
       // Sin categoría elegida: reutilizar una categoría genérica ("Otros ingresos" / "Otros gastos")
@@ -336,7 +326,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
   const projectedBalance = isDeducting ? currentBalance - parsedAmount : currentBalance + parsedAmount;
   
   // Riesgo de sobregiro: aplica solo a cuentas no crediticias (Bancos, Efectivo, Billeteras digitales) cuando el saldo proyectado queda negativo
-  const isOverdraftRisk = isDeducting && !isCreditAccount && parsedAmount > 0 && projectedBalance < 0;
+  const isOverdraftRisk = Boolean(selectedAccount) && isDeducting && !isCreditAccount && parsedAmount > 0 && projectedBalance < 0;
 
   const currentCurrency = selectedAccount?.currency || 'PEN';
   const targetCurrency = selectedTargetAccount?.currency || currentCurrency;
@@ -689,7 +679,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
                         ))
                       )
                     ) : (
-                      <option value="">Cuenta Principal (Autocrear)</option>
+                      <option value="">Selecciona una cuenta</option>
                     )}
                   </select>
                 </div>
@@ -763,7 +753,7 @@ export function CreateTransactionModal({ isOpen, onClose, defaultType = 'expense
                         </option>
                       ))
                     ) : (
-                      <option value="">Categoría General (Autocrear)</option>
+                      <option value="">Otros (categoría general)</option>
                     )}
                   </select>
                 )}
