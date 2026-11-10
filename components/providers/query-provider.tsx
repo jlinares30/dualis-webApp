@@ -14,7 +14,7 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
             refetchOnWindowFocus: false,
             retry: (failureCount, error: any) => {
               // No reintentar si el token expiró o no está autorizado
-              if (error?.status === 401) return false;
+              if (error?.status === 401 || error?.status === 403 || error?.status === 429) return false;
               return failureCount < 1;
             },
           },

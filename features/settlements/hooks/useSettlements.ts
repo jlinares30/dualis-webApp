@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { SHARED_DATA_REFETCH_MS } from '@/lib/query-config';
 import {
   getDebtBalanceSummary,
   getSettlementsByWorkspace,
@@ -34,7 +35,8 @@ export function useDebtBalanceSummary(customWorkspaceId?: string) {
     },
     enabled: (!isAuthenticated) || (Boolean(isValidUuid) && Boolean(isCoupleWorkspace)),
     retry: false,
-    refetchInterval: isAuthenticated ? 5000 : false,
+    refetchInterval: isAuthenticated ? SHARED_DATA_REFETCH_MS : false,
+    refetchOnWindowFocus: true,
     refetchIntervalInBackground: false,
   });
 }

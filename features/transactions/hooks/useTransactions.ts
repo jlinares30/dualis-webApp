@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { SHARED_DATA_REFETCH_MS } from '@/lib/query-config';
 import { getTransactions, createTransaction, updateTransaction, deleteTransaction } from '@/lib/services';
 import { CreateTransactionRequest } from '@/types';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
@@ -62,7 +63,8 @@ export function useTransactions(
       });
     },
     enabled: (!isAuthenticated) || Boolean(isValidUuid),
-    refetchInterval: isAuthenticated && hasPartner ? 5000 : false,
+    refetchInterval: isAuthenticated && hasPartner ? SHARED_DATA_REFETCH_MS : false,
+    refetchOnWindowFocus: true,
     refetchIntervalInBackground: false,
   });
 }

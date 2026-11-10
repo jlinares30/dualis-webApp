@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { SHARED_DATA_REFETCH_MS } from '@/lib/query-config';
 import { 
   getUserWorkspaces, 
   getWorkspaceById,
@@ -48,7 +49,8 @@ export function useWorkspaces() {
       return data;
     },
     enabled: true,
-    refetchInterval: isAuthenticated ? 4000 : false,
+    refetchInterval: isAuthenticated ? SHARED_DATA_REFETCH_MS : false,
+    refetchOnWindowFocus: true,
     refetchIntervalInBackground: false,
   });
 }

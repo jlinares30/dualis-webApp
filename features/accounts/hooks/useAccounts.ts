@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { SHARED_DATA_REFETCH_MS } from '@/lib/query-config';
 import { getAccounts, createAccount, updateAccount, deleteAccount, CreateAccountRequest } from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
@@ -22,7 +23,8 @@ export function useAccounts(customWorkspaceId?: string) {
       return getAccounts(activeWorkspaceId!);
     },
     enabled: (!isAuthenticated) || Boolean(isValidUuid),
-    refetchInterval: isAuthenticated && hasPartner ? 5000 : false,
+    refetchInterval: isAuthenticated && hasPartner ? SHARED_DATA_REFETCH_MS : false,
+    refetchOnWindowFocus: true,
     refetchIntervalInBackground: false,
   });
 }

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { SHARED_DATA_REFETCH_MS } from '@/lib/query-config';
 import { 
   getSplitRulesByWorkspace, 
   createSplitRule, 
@@ -26,7 +27,8 @@ export function useSplitRules() {
     },
     enabled: (!isAuthenticated) || Boolean(isValidUuid),
     // Near Real-Time: sondea cambios en segundo plano cada 4s si es workspace de pareja
-    refetchInterval: isAuthenticated && hasPartner ? 4000 : false,
+    refetchInterval: isAuthenticated && hasPartner ? SHARED_DATA_REFETCH_MS : false,
+    refetchOnWindowFocus: true,
     refetchIntervalInBackground: false, // Pausa si la pestaña no está activa para ahorrar recursos
   });
 }

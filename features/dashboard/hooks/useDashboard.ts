@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { SHARED_DATA_REFETCH_MS } from '@/lib/query-config';
 import { getDashboardSummary } from '@/lib/services';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
 import { useWorkspaceStore } from '@/lib/stores/useWorkspaceStore';
@@ -22,7 +23,8 @@ export function useDashboardSummary(period?: { year: number; month: number }) {
       return getDashboardSummary(activeWorkspaceId!, period);
     },
     enabled: (!isAuthenticated) || Boolean(isValidUuid),
-    refetchInterval: isAuthenticated && hasPartner ? 5000 : false,
+    refetchInterval: isAuthenticated && hasPartner ? SHARED_DATA_REFETCH_MS : false,
+    refetchOnWindowFocus: true,
     refetchIntervalInBackground: false,
   });
 }

@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { SHARED_DATA_REFETCH_MS } from '@/lib/query-config';
 import { getSubscriptions, createSubscription, toggleSubPaidStatus, deleteSubscription } from '@/lib/services';
 import { CreateSubscriptionRequest } from '@/types';
 import {
@@ -33,7 +34,8 @@ export function useSubscriptions(period?: SubscriptionPeriod) {
     },
     // Wait for a real workspace id (the demo id is used before the user's workspaces load)
     enabled: (!isAuthenticated) || isUuid(activeWorkspaceId),
-    refetchInterval: isAuthenticated && hasPartner ? 5000 : false,
+    refetchInterval: isAuthenticated && hasPartner ? SHARED_DATA_REFETCH_MS : false,
+    refetchOnWindowFocus: true,
     refetchIntervalInBackground: false,
   });
 }
