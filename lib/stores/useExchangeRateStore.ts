@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { apiFetch } from '@/lib/api';
+
+interface BackendExchangeRates {
+  base: string;
+  rates: ExchangeRates;
+  updatedAt: string;
+  source: 'live' | 'fallback' | string;
+}
 
 export interface ExchangeRates {
   [currencyCode: string]: number; // Tasa relativa a USD (USD = 1)
@@ -99,13 +107,14 @@ export const useExchangeRateStore = create<ExchangeRateState>()(
       },
 
       fetchLiveRates: async () => {
+        // Las tasas vienen del backend (fuente única también usada para transferencias y reportes).
+        // Sin sesión (modo demo) se mantienen las tasas de referencia locales.
+        if (typeof window === 'undefined' || !localStorage.getItem('dualis_auth_token')) {
+          return;
+        }
         set({ isLoading: true, error: null });
         try {
-          const res = await fetch('https://open.er-api.com/v6/latest/USD');
-          if (!res.ok) {
-            throw new Error(`Error en el servicio de divisas: ${res.statusText}`);
-          }
-          const data = await res.json();
+          const data = await apiFetch<BackendExchangeRates>('/exchange-rates');
           if (data && data.rates) {
             set((state) => ({
               rates: {

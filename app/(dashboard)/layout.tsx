@@ -50,16 +50,9 @@ export default function DashboardLayout({
           preferredCurrency: remoteProfile.preferredCurrency,
         });
       }
-
-      // Si el workspace activo no tiene la misma moneda que el perfil del usuario, sincronizarlo
-      if (remoteProfile.preferredCurrency && activeWorkspaceId) {
-        const activeWs = workspaces.find((w) => w.id === activeWorkspaceId);
-        if (activeWs && activeWs.currency !== remoteProfile.preferredCurrency) {
-          useWorkspaceStore.getState().updateWorkspaceCurrency(activeWorkspaceId, remoteProfile.preferredCurrency);
-        }
-      }
+      // La moneda de cada espacio viene del servidor; no se sobrescribe con la moneda del perfil.
     }
-  }, [remoteProfile, user, setUser, activeWorkspaceId, workspaces]);
+  }, [remoteProfile, user, setUser]);
 
   useEffect(() => {
     if (!hasPartner && workspaces.length > 0) {
