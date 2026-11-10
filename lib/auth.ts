@@ -141,6 +141,19 @@ export async function submitOnboarding(payload: OnboardingPayload): Promise<User
   };
 }
 
+/**
+ * Renews the access token while the session is active (the backend keeps the original login time and
+ * stops renewing after 30 days). Returns the new token, or null if it could not be renewed.
+ */
+export async function refreshSessionToken(): Promise<string | null> {
+  const response = await apiFetch<BackendAuthResponse>('/auth/refresh', { method: 'POST' });
+  if (response?.accessToken && typeof window !== 'undefined') {
+    localStorage.setItem('dualis_auth_token', response.accessToken);
+    return response.accessToken;
+  }
+  return null;
+}
+
 export function logout(): void {
   if (typeof window !== 'undefined') {
     // Limpiar claves del sistema Dualis

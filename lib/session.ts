@@ -15,6 +15,21 @@ export function getTokenExpiresAt(token: string): number | null {
   }
 }
 
+/** Total lifetime of the token in ms (exp - iat), or null if unknown. */
+export function getTokenLifetimeMs(token: string): number | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const claims: unknown = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')));
+    if (typeof claims !== 'object' || claims === null || !('exp' in claims) || !('iat' in claims)) return null;
+    const { exp, iat } = claims as { exp: unknown; iat: unknown };
+    return typeof exp === 'number' && typeof iat === 'number' ? (exp - iat) * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 export function isTokenExpired(token: string): boolean {
   const expiresAt = getTokenExpiresAt(token);
   return expiresAt !== null && Date.now() >= expiresAt;

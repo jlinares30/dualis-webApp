@@ -3,7 +3,11 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '@/lib/stores/useAuthStore';
-import { expireSession, getTokenExpiresAt, SESSION_EXPIRED_EVENT } from '@/lib/session';
+import { expireSession, getTokenExpiresAt, getTokenLifetimeMs, SESSION_EXPIRED_EVENT } from '@/lib/session';
+import { refreshSessionToken } from '@/lib/auth';
+
+// Renew the token this long before it expires, as long as the app is open and visible.
+const REFRESH_BEFORE_EXPIRY_MS = 10 * 60 * 1000;
 
 export function SessionMonitor() {
   const queryClient = useQueryClient();
@@ -11,6 +15,22 @@ export function SessionMonitor() {
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let refreshing = false;
+    const tryRefresh = async () => {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const newToken = await refreshSessionToken();
+        const { user, setAuth } = useAuthStore.getState();
+        if (newToken && user) {
+          setAuth(newToken, user);
+        }
+      } catch {
+        // apiFetch already expires the session on 401; otherwise keep the current token until it expires
+      } finally {
+        refreshing = false;
+      }
+    };
     const clearSession = () => {
       useAuthStore.setState({ token: null, user: null, isAuthenticated: false });
       queryClient.clear();
@@ -27,9 +47,18 @@ export function SessionMonitor() {
       const remaining = expiresAt - Date.now();
       if (remaining <= 0) {
         expireSession();
-      } else {
-        timer = setTimeout(checkSession, Math.min(remaining, 2_147_483_647));
+        return;
       }
+      // Never use a window longer than half the token lifetime, so a fresh token is not renewed again.
+      const lifetime = getTokenLifetimeMs(storedToken);
+      const refreshWindow = lifetime ? Math.min(REFRESH_BEFORE_EXPIRY_MS, lifetime / 2) : REFRESH_BEFORE_EXPIRY_MS;
+      if (remaining <= refreshWindow && document.visibilityState === 'visible') {
+        // The token change re-runs this effect, which schedules the next check.
+        void tryRefresh();
+      }
+      const untilRefresh = remaining - refreshWindow;
+      const next = untilRefresh > 0 ? untilRefresh : remaining;
+      timer = setTimeout(checkSession, Math.min(next, 2_147_483_647));
     };
 
     window.addEventListener(SESSION_EXPIRED_EVENT, clearSession);
