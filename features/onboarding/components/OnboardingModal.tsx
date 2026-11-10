@@ -62,7 +62,7 @@ export function OnboardingModal({ isOpen, onComplete }: OnboardingModalProps) {
 
       // Obtener y sincronizar inmediatamente los workspaces actualizados
       try {
-        const freshWorkspaces = await getUserWorkspaces(user?.email || undefined);
+        const freshWorkspaces = await getUserWorkspaces();
         if (freshWorkspaces && freshWorkspaces.length > 0) {
           setWorkspaces(freshWorkspaces);
           const individualWs = freshWorkspaces.find((w) => w.type === 'INDIVIDUAL' || (w.type as any) === 'personal') || freshWorkspaces[0];

@@ -79,6 +79,17 @@ export async function apiFetch<T>(
     }
 
 
+    // Mensajes claros para errores que el usuario puede entender y resolver
+    if (response.status === 403) {
+      errorMessage = 'No tienes acceso a este espacio o recurso. Si te desvincularon del espacio de pareja, recarga la página.';
+    } else if (response.status === 409) {
+      errorMessage = 'Los datos cambiaron mientras guardabas (quizá tu pareja hizo un cambio). Recarga e inténtalo de nuevo.';
+    } else if (response.status === 429) {
+      const retryAfter = Number(response.headers.get('Retry-After'));
+      const minutes = Number.isFinite(retryAfter) && retryAfter > 0 ? Math.ceil(retryAfter / 60) : 15;
+      errorMessage = `Demasiados intentos fallidos. Inténtalo de nuevo en ${minutes} minuto${minutes === 1 ? '' : 's'}.`;
+    }
+
     console.error(`[API Error] ${options.method || 'GET'} ${API_BASE_URL}${endpoint} returned ${response.status}:`, errorMessage, errorData);
 
     throw new ApiError(

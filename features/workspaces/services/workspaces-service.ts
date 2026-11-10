@@ -11,7 +11,6 @@ export interface CreateWorkspacePayload {
   description?: string;
   type: 'INDIVIDUAL' | 'COUPLE';
   currency?: string;
-  ownerEmail: string;
 }
 
 export interface UpdateWorkspacePayload {
@@ -22,12 +21,11 @@ export interface UpdateWorkspacePayload {
 
 export interface JoinWorkspacePayload {
   invitationCode: string;
-  partnerEmail: string;
 }
 
-export async function getUserWorkspaces(userEmail?: string): Promise<WorkspaceDTO[]> {
-  const queryParam = userEmail ? `?userEmail=${encodeURIComponent(userEmail)}` : '';
-  return apiFetch<WorkspaceDTO[]>(`/workspaces${queryParam}`);
+/** Workspaces of the authenticated user (the backend identifies the user from the token). */
+export async function getUserWorkspaces(): Promise<WorkspaceDTO[]> {
+  return apiFetch<WorkspaceDTO[]>('/workspaces');
 }
 
 export async function createWorkspace(data: CreateWorkspacePayload): Promise<WorkspaceDTO> {
@@ -64,10 +62,12 @@ export async function getInviteCode(workspaceId?: string): Promise<InviteCodeRes
   }
 }
 
-export async function joinWorkspaceByCode(code: string, partnerEmail: string): Promise<WorkspaceDTO> {
+/** Joins a couple workspace as the authenticated user. */
+export async function joinWorkspaceByCode(code: string): Promise<WorkspaceDTO> {
+  const payload: JoinWorkspacePayload = { invitationCode: code };
   return apiFetch<WorkspaceDTO>('/workspaces/join', {
     method: 'POST',
-    body: JSON.stringify({ invitationCode: code, partnerEmail }),
+    body: JSON.stringify(payload),
   });
 }
 

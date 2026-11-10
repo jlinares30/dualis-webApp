@@ -71,10 +71,7 @@ export default function WorkspacesPage() {
         }
 
         try {
-          const joined = await joinWorkspaceMut({
-            code: cleanCode,
-            partnerEmail: user?.email || '',
-          });
+          const joined = await joinWorkspaceMut({ code: cleanCode });
 
           if (joined?.id) {
             setActiveWorkspace(joined.id, 'COUPLE');

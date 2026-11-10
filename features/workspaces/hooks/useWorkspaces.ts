@@ -27,7 +27,7 @@ export function useWorkspaces() {
         return DEMO_WORKSPACES;
       }
 
-      let data = await getUserWorkspaces(user?.email || undefined);
+      let data = await getUserWorkspaces();
       
       // Si el usuario es nuevo y no tiene ningún workspace creado aún en la BD:
       if (data.length === 0 && user?.email) {
@@ -37,7 +37,6 @@ export function useWorkspaces() {
             description: 'Espacio de finanzas personales',
             type: 'INDIVIDUAL',
             currency: user.preferredCurrency || 'PEN',
-            ownerEmail: user.email,
           });
           data = [defaultWorkspace];
         } catch (e) {
@@ -70,7 +69,7 @@ export function useCreateWorkspace() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { name: string; description?: string; type: 'INDIVIDUAL' | 'COUPLE'; currency?: string; ownerEmail: string }) =>
+    mutationFn: (payload: { name: string; description?: string; type: 'INDIVIDUAL' | 'COUPLE'; currency?: string }) =>
       createWorkspace(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
@@ -112,8 +111,7 @@ export function useJoinWorkspace() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ code, partnerEmail }: { code: string; partnerEmail: string }) => 
-      joinWorkspaceByCode(code, partnerEmail),
+    mutationFn: ({ code }: { code: string }) => joinWorkspaceByCode(code),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspaces'] });
       queryClient.invalidateQueries({ queryKey: ['workspaceDetails'] });

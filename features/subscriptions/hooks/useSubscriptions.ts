@@ -119,7 +119,7 @@ export function useSalaryDistributionConfig() {
         return DEMO_SALARY_CONFIG;
       }
       const { getSalaryDistributionConfig } = await import('../services/subscriptions-service');
-      return getSalaryDistributionConfig(activeWorkspaceId!, user?.email);
+      return getSalaryDistributionConfig(activeWorkspaceId!);
     },
     enabled: (!isAuthenticated) || isUuid(activeWorkspaceId),
     staleTime: 1000 * 60 * 5,

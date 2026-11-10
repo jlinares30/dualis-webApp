@@ -180,7 +180,6 @@ export default function SettingsPage() {
           description: 'Finanzas compartidas en pareja',
           type: 'COUPLE',
           currency: currency,
-          ownerEmail: user?.email || email,
         });
 
         if (created?.id) {
@@ -211,10 +210,7 @@ export default function SettingsPage() {
       }
 
       try {
-        const joined = await joinWorkspaceMut({
-          code: inviteCodeInput.trim(),
-          partnerEmail: user?.email || email,
-        });
+        const joined = await joinWorkspaceMut({ code: inviteCodeInput.trim() });
 
         if (joined?.id) {
           setActiveWorkspace(joined.id, 'COUPLE');

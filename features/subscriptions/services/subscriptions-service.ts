@@ -53,15 +53,12 @@ export async function deleteSubscription(subId: string): Promise<void> {
   });
 }
 
-export async function getSalaryDistributionConfig(
-  workspaceId?: string,
-  userEmail?: string
-): Promise<any | null> {
+/** Salary distribution config of the authenticated user in the workspace. */
+export async function getSalaryDistributionConfig(workspaceId?: string): Promise<any | null> {
   if (!workspaceId) return null;
-  const emailParam = userEmail ? `&userEmail=${encodeURIComponent(userEmail)}` : '';
   try {
     return await apiFetch<any>(
-      `/subscriptions/salary-distribution?workspaceId=${encodeURIComponent(workspaceId)}${emailParam}`
+      `/subscriptions/salary-distribution?workspaceId=${encodeURIComponent(workspaceId)}`
     );
   } catch {
     return null;
